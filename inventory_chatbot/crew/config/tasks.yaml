@@ -1,0 +1,124 @@
+analyze_query:
+  description: >
+    Analyze the user's query: "{query}"
+    
+    Identify the intent (e.g., COUNT, STATISTICS, FORECAST, VISUALIZATION, GENERAL_INQUIRY).
+    Extract relevant entities such as:
+    - Item numbers
+    - Store IDs
+    - Date ranges
+    - Metrics requested (sales, stock levels, alerts)
+    - Aggregation types (sum, average, count)
+    
+    Determine which downstream tasks should be executed based on the intent.
+  expected_output: >
+    A structured JSON object containing:
+    {{
+      "intent": "FORECAST|VISUALIZATION|STATISTICS|COUNT|GENERAL",
+      "entities": {{
+        "item": <number or null>,
+        "store": <number or null>,
+        "metric": "sales|stock_level|alerts|...",
+        "aggregation": "sum|avg|count|...",
+        "date_range": "..."
+      }},
+      "requires_forecast": <boolean>,
+      "requires_visualization": <boolean>,
+      "requires_data_query": <boolean>
+    }}
+  agent: query_analyzer
+
+fetch_data:
+  description: >
+    Based on the query analysis, retrieve the requested data from the inventory dataset.
+    
+    Available context:
+    - Dataset columns: {columns}
+    - Total rows: {row_count}
+    - Entities extracted: {entities}
+    
+    Execute the appropriate query (COUNT, SUM, FILTER, AGGREGATE) and return results.
+  expected_output: >
+    A structured result containing the requested data or statistics.
+    For example:
+    - For COUNT: {{"count": <number>}}
+    - For SUM: {{"total": <number>, "column": "Daily_Sales"}}
+    - For FILTER: {{"matching_rows": <number>, "sample": [...]}}
+  agent: data_analyst
+  context:
+    - analyze_query
+
+generate_forecast:
+  description: >
+    Generate a demand forecast for the specified item and store.
+    
+    Context:
+    - Item: {item}
+    - Store: {store}
+    - Forecast periods: {periods}
+    
+    Use the most appropriate forecasting model (ARIMA, Prophet, or LightGBM) based on data characteristics.
+    Return forecast values, confidence intervals, and model metadata.
+  expected_output: >
+    A JSON object containing:
+    {{
+      "model_used": "ARIMA|Prophet|LightGBM",
+      "forecast_values": [
+        {{"date": "...", "predicted_value": <number>, "lower_bound": <number>, "upper_bound": <number>}},
+        ...
+      ],
+      "chart_base64": "<base64 encoded PNG>",
+      "metrics": {{"mae": <number>, "rmse": <number>}}
+    }}
+  agent: forecasting_agent
+  context:
+    - analyze_query
+
+create_visualization:
+  description: >
+    Create a visualization based on the user's request and analyzed intent.
+    
+    Context:
+    - Query intent: {intent}
+    - Dataset info: {columns}, {row_count} rows
+    
+    Generate an appropriate chart type (line chart for trends, bar chart for comparisons, etc.)
+    and return as a base64-encoded PNG image.
+  expected_output: >
+    A JSON object containing:
+    {{
+      "chart_base64": "<base64 encoded PNG>",
+      "chart_type": "trend_line|bar|histogram|...",
+      "description": "Brief description of what the chart shows"
+    }}
+  agent: visualization_agent
+  context:
+    - analyze_query
+    - fetch_data
+
+synthesize_response:
+  description: >
+    Create a final user-facing response by synthesizing outputs from all previous tasks.
+    
+    Inputs available:
+    - Query analysis: {analysis}
+    - Data results: {data_results}
+    - Forecast results: {forecast_results}
+    - Visualization: {visualization}
+    
+    Generate a clear, helpful response that:
+    1. Directly answers the user's question
+    2. Includes relevant statistics or findings
+    3. References any attached visualizations or forecasts
+    4. Uses natural, conversational language
+    
+    Do NOT fabricate information - only use data from previous task outputs.
+  expected_output: >
+    A well-formatted response string that comprehensively answers the user's query,
+    suitable for direct display to the user.
+  agent: response_generator
+  context:
+    - analyze_query
+    - fetch_data
+    - generate_forecast
+    - create_visualization
