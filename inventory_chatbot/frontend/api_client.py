@@ -3,7 +3,10 @@
 import requests
 import streamlit as st
 
-BACKEND_URL = "http://127.0.0.1:8000/api/v1"
+import os
+
+# Read from environment, fallback to localhost for local dev
+BACKEND_URL = os.getenv("API_URL", "http://127.0.0.1:8000/api/v1")
 
 class APIClient:
     """Handles all communication with the FastAPI backend."""
