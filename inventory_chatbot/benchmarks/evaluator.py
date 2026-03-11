@@ -1,93 +1,457 @@
 # inventory_chatbot/benchmarks/evaluator.py
 
+"""
+Enhanced benchmarking suite with:
+  - P50/P95/P99 latency percentiles
+  - CPU utilization monitoring
+  - Tool-use accuracy evaluation
+  - Ablation testing (pipeline vs direct LLM)
+"""
+
 import time
 import logging
+import numpy as np
 import pandas as pd
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+
 from inventory_chatbot.crew.simple_orchestrator import SimpleInventoryOrchestrator
+from inventory_chatbot.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+# ──────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────
+
+def _percentiles(values: List[float]) -> Dict[str, float]:
+    """Compute P50, P95, P99, mean, std from a list of floats."""
+    arr = np.array(values)
+    return {
+        "p50": round(float(np.percentile(arr, 50)), 3),
+        "p95": round(float(np.percentile(arr, 95)), 3),
+        "p99": round(float(np.percentile(arr, 99)), 3),
+        "mean": round(float(np.mean(arr)), 3),
+        "std": round(float(np.std(arr)), 3),
+        "min": round(float(np.min(arr)), 3),
+        "max": round(float(np.max(arr)), 3),
+    }
+
+
+def _cpu_snapshot() -> Optional[float]:
+    """Return current process CPU % (None if psutil unavailable)."""
+    if not PSUTIL_AVAILABLE:
+        return None
+    try:
+        proc = psutil.Process()
+        return proc.cpu_percent(interval=0.1)
+    except Exception:
+        return None
+
+
+# ──────────────────────────────────────────────
+# Main evaluator class
+# ──────────────────────────────────────────────
+
 class RobustnessEvaluator:
     """
-    Benchmarks LLM performance on consistency and noise sensitivity.
+    Benchmarks LLM performance on consistency, noise sensitivity,
+    precision, tool-use accuracy, and ablations.
     """
-    
+
     def __init__(self, df: pd.DataFrame):
         self.df = df
-        # Note: We create a new orchestrator for each evaluation to ensure a fresh session context
-        # but sharing the same DF.
-        
+
+    # ============================================================
+    # 1. CONSISTENCY TEST  (with P99 latency + CPU)
+    # ============================================================
     def run_consistency_test(self, query: str, trials: int = 5) -> Dict[str, Any]:
         """
-        Runs the same query multiple times and checks for stability.
+        Runs the same query multiple times; reports stability and
+        P50/P95/P99 latency percentiles.
         """
         results = []
-        sql_queries = []
-        
+
         for i in range(trials):
             orchestrator = SimpleInventoryOrchestrator(dataframe=self.df, user_role="admin")
+            cpu_before = _cpu_snapshot()
             start_time = time.time()
             res = orchestrator.execute(query)
             end_time = time.time()
-            
-            # Check if SQL was used and extract it
-            # Note: sql_used is typically returned by the orchestrator in some way or we can check the context
-            # In our current SimpleInventoryOrchestrator, it returns a dict with 'response'
-            # We might need to expose the tool outputs for better evaluation.
-            # For now, let's just track the final response and any metadata we can find.
-            
+            cpu_after = _cpu_snapshot()
+
             results.append({
                 "trial": i + 1,
                 "response": res.get("response", ""),
-                "latency": round(end_time - start_time, 2)
+                "latency": round(end_time - start_time, 3),
+                "cpu_before": cpu_before,
+                "cpu_after": cpu_after,
             })
-            
-        # Analysis
-        unique_responses = len(set([r["response"] for r in results]))
+
+        latencies = [r["latency"] for r in results]
+        unique_responses = len(set(r["response"] for r in results))
         consistency_score = (trials - (unique_responses - 1)) / trials
-        
+
         return {
             "query": query,
             "trials": trials,
             "consistency_score": round(consistency_score, 2),
             "unique_responses": unique_responses,
-            "details": results
+            "latency_stats": _percentiles(latencies),
+            "details": results,
         }
 
+    # ============================================================
+    # 2. NOISE / TYPO SENSITIVITY TEST
+    # ============================================================
     def run_noise_test(self, base_query: str, noisy_queries: List[str]) -> Dict[str, Any]:
         """
         Tests how typos/noise in the query affects the output.
         """
         orchestrator = SimpleInventoryOrchestrator(dataframe=self.df, user_role="admin")
-        
-        # Base run
+
         base_res = orchestrator.execute(base_query)
         base_response = base_res.get("response", "")
-        
+
         results = []
         for q in noisy_queries:
+            start = time.time()
             res = orchestrator.execute(q)
+            elapsed = round(time.time() - start, 3)
             results.append({
                 "noisy_query": q,
                 "response": res.get("response", ""),
-                "is_successful": "error" not in res.get("response", "").lower() # Basic check
+                "is_successful": "error" not in res.get("response", "").lower(),
+                "latency": elapsed,
             })
-            
+
         return {
             "base_query": base_query,
-            "noisy_results": results
+            "base_response_preview": base_response[:120],
+            "noisy_results": results,
         }
 
+    # ============================================================
+    # 3. PRECISION / EXACT-MATCH TEST  (with P99)
+    # ============================================================
+    def run_precision_test(self, queries: List[Dict[str, str]]) -> Dict[str, Any]:
+        """
+        Tests if the LLM responses contain ground-truth expected
+        keywords/numbers.  Reports per-query latency + overall P99.
+        """
+        results = []
+        successful_matches = 0
+        latencies = []
+
+        for q_obj in queries:
+            query = q_obj["query"]
+            expected = q_obj["expected"]
+            category = q_obj.get("category", "general")
+
+            orchestrator = SimpleInventoryOrchestrator(dataframe=self.df, user_role="admin")
+            cpu_before = _cpu_snapshot()
+            start_time = time.time()
+            res = orchestrator.execute(query)
+            end_time = time.time()
+            cpu_after = _cpu_snapshot()
+
+            elapsed = round(end_time - start_time, 3)
+            latencies.append(elapsed)
+
+            response_text = res.get("response", "")
+            is_match = str(expected).lower() in str(response_text).lower()
+            if is_match:
+                successful_matches += 1
+
+            results.append({
+                "query": query,
+                "category": category,
+                "expected": expected,
+                "response_preview": response_text[:200],
+                "is_match": is_match,
+                "latency": elapsed,
+                "cpu_before": cpu_before,
+                "cpu_after": cpu_after,
+            })
+
+        precision_score = successful_matches / len(queries) if queries else 0.0
+
+        return {
+            "total_tests": len(queries),
+            "precision_score": round(precision_score, 2),
+            "latency_stats": _percentiles(latencies) if latencies else {},
+            "details": results,
+        }
+
+    # ============================================================
+    # 4. DATA CORRUPTION TEST
+    # ============================================================
     def run_data_corruption_test(self, query: str, corrupt_df: pd.DataFrame) -> Dict[str, Any]:
         """
         Tests how the LLM/Orchestrator handles corrupted data.
         """
         orchestrator = SimpleInventoryOrchestrator(dataframe=corrupt_df, user_role="admin")
         res = orchestrator.execute(query)
-        
+        resp = res.get("response", "")
+
         return {
             "query": query,
-            "response": res.get("response", ""),
-            "status": "Handled" if "error" in res.get("response", "").lower() or "not find" in res.get("response", "").lower() else "Processed"
+            "response_preview": resp[:200],
+            "status": "Handled" if "error" in resp.lower() or "not find" in resp.lower() else "Processed",
+        }
+
+    # ============================================================
+    # 5. TOOL-USE ACCURACY TEST
+    # ============================================================
+    def run_tool_use_test(
+        self,
+        test_cases: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Evaluates whether the orchestrator classifies queries to the
+        correct tool/pipeline path.
+
+        Each test case: {
+            "query": str,
+            "expected_type": "SQL" | "LLM",          # classification
+            "expected_tool": str | None,              # e.g. "forecast_tool"
+        }
+        """
+        results = []
+        correct_classifications = 0
+        latencies = []
+
+        for tc in test_cases:
+            q = tc["query"]
+            expected_type = tc.get("expected_type")
+
+            orchestrator = SimpleInventoryOrchestrator(dataframe=self.df, user_role="admin")
+
+            # Measure classification only
+            start = time.time()
+            actual_type = orchestrator._classify_query_type(q)
+            classify_time = round(time.time() - start, 3)
+
+            type_correct = (actual_type == expected_type) if expected_type else None
+            if type_correct:
+                correct_classifications += 1
+
+            # Run full pipeline for latency
+            start2 = time.time()
+            res = orchestrator.execute(q)
+            total_time = round(time.time() - start2, 3)
+            latencies.append(total_time)
+
+            results.append({
+                "query": q,
+                "expected_type": expected_type,
+                "actual_type": actual_type,
+                "type_correct": type_correct,
+                "classify_latency": classify_time,
+                "total_latency": total_time,
+            })
+
+        accuracy = correct_classifications / len(test_cases) if test_cases else 0.0
+
+        return {
+            "total_tests": len(test_cases),
+            "classification_accuracy": round(accuracy, 2),
+            "latency_stats": _percentiles(latencies) if latencies else {},
+            "details": results,
+        }
+
+    # ============================================================
+    # 6. ABLATION: PIPELINE vs DIRECT LLM
+    # ============================================================
+    def run_ablation_pipeline_vs_direct(
+        self,
+        queries: List[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """
+        Compares the full NLP pipeline (classify → SQL/tools → LLM
+        response) against sending the query directly to the LLM with
+        raw data context.
+
+        Each query: {"query": str, "expected": str}
+        """
+        from langchain_groq import ChatGroq
+
+        llm = ChatGroq(
+            api_key=settings.GROQ_API_KEY,
+            model_name=settings.GROQ_MODEL,
+            temperature=0.15,
+            max_tokens=800,
+        )
+
+        pipeline_results = []
+        direct_results = []
+
+        for q_obj in queries:
+            query = q_obj["query"]
+            expected = q_obj["expected"]
+
+            # ── A. Full pipeline ──
+            orchestrator = SimpleInventoryOrchestrator(dataframe=self.df, user_role="admin")
+            start = time.time()
+            pipe_res = orchestrator.execute(query)
+            pipe_time = round(time.time() - start, 3)
+            pipe_text = pipe_res.get("response", "")
+            pipe_match = str(expected).lower() in pipe_text.lower()
+
+            pipeline_results.append({
+                "query": query,
+                "expected": expected,
+                "response_preview": pipe_text[:150],
+                "is_match": pipe_match,
+                "latency": pipe_time,
+            })
+
+            # ── B. Direct LLM (no pipeline, no tools) ──
+            # Give the LLM a sample of the data as context
+            sample = self.df.head(20).to_string(index=False)
+            cols = list(self.df.columns)
+            shape = f"{self.df.shape[0]} rows × {self.df.shape[1]} columns"
+
+            direct_prompt = f"""You have an inventory dataset ({shape}).
+Columns: {cols}
+
+Sample data:
+{sample}
+
+Answer this question accurately and concisely:
+{query}"""
+
+            start2 = time.time()
+            try:
+                direct_resp = llm.invoke([{"role": "user", "content": direct_prompt}])
+                direct_text = direct_resp.content
+            except Exception as e:
+                direct_text = f"Error: {e}"
+            direct_time = round(time.time() - start2, 3)
+
+            direct_match = str(expected).lower() in direct_text.lower()
+
+            direct_results.append({
+                "query": query,
+                "expected": expected,
+                "response_preview": direct_text[:150],
+                "is_match": direct_match,
+                "latency": direct_time,
+            })
+
+        # Aggregate
+        pipe_latencies = [r["latency"] for r in pipeline_results]
+        direct_latencies = [r["latency"] for r in direct_results]
+        pipe_accuracy = sum(1 for r in pipeline_results if r["is_match"]) / len(pipeline_results) if pipeline_results else 0
+        direct_accuracy = sum(1 for r in direct_results if r["is_match"]) / len(direct_results) if direct_results else 0
+
+        return {
+            "pipeline": {
+                "accuracy": round(pipe_accuracy, 2),
+                "latency_stats": _percentiles(pipe_latencies) if pipe_latencies else {},
+                "details": pipeline_results,
+            },
+            "direct_llm": {
+                "accuracy": round(direct_accuracy, 2),
+                "latency_stats": _percentiles(direct_latencies) if direct_latencies else {},
+                "details": direct_results,
+            },
+        }
+
+    # ============================================================
+    # 7. ABLATION: FORECASTING MODEL COMPARISON
+    # ============================================================
+    def run_ablation_forecast_models(
+        self,
+        item: int,
+        store: int,
+        periods: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        Compares LightGBM vs ARIMA vs Exp.Smoothing on the same item/store.
+        Reports forecasted values and latency for each.
+        """
+        from inventory_chatbot.analytics.forecasting import ForecastingTool
+
+        tool = ForecastingTool()
+        subset = self.df[
+            (self.df["Item"].astype(str) == str(item))
+            & (self.df["Store"].astype(str) == str(store))
+        ].copy()
+
+        if subset.empty:
+            return {"error": f"No data for item {item} store {store}"}
+
+        subset["Date"] = pd.to_datetime(subset["Date"])
+        subset = subset.sort_values("Date")
+        n = len(subset)
+
+        results = {}
+
+        # LightGBM (global pre-trained)
+        if tool.lgbm_model and n >= 1:
+            start = time.time()
+            preds = tool.lgbm_forecast(subset, periods, item, store)
+            elapsed = round(time.time() - start, 3)
+            results["LightGBM (global)"] = {
+                "predictions": [round(float(p), 2) for p in preds] if preds is not None else None,
+                "latency": elapsed,
+                "status": "success" if preds is not None else "discarded (out-of-scale)",
+            }
+
+        # LightGBM (fitted on uploaded data)
+        if n >= 30:
+            start = time.time()
+            preds = tool._train_lgbm_on_data(subset, periods, item, store)
+            elapsed = round(time.time() - start, 3)
+            results["LightGBM (fitted)"] = {
+                "predictions": [round(float(p), 2) for p in preds] if preds is not None else None,
+                "latency": elapsed,
+                "status": "success" if preds is not None else "failed",
+            }
+
+        # ARIMA
+        if n >= 20:
+            start = time.time()
+            preds = tool.arima_forecast(subset, periods)
+            elapsed = round(time.time() - start, 3)
+            results["ARIMA"] = {
+                "predictions": [round(float(p), 2) for p in preds],
+                "latency": elapsed,
+                "status": "success",
+            }
+
+        # Exponential Smoothing
+        if n >= 7:
+            start = time.time()
+            preds = tool.exp_smoothing(subset, periods)
+            elapsed = round(time.time() - start, 3)
+            results["Exponential Smoothing"] = {
+                "predictions": [round(float(p), 2) for p in preds],
+                "latency": elapsed,
+                "status": "success",
+            }
+
+        # Moving Average
+        if n >= 2:
+            start = time.time()
+            val = tool.moving_avg(subset)
+            elapsed = round(time.time() - start, 3)
+            results["Moving Average (7-day)"] = {
+                "predictions": [round(float(val), 2)] * periods,
+                "latency": elapsed,
+                "status": "success",
+            }
+
+        return {
+            "item": item,
+            "store": store,
+            "data_points": n,
+            "models": results,
         }
