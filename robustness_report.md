@@ -12,10 +12,10 @@ $$\text{Consistency Score} = \frac{\text{Identical Structured Outputs}}{\text{To
 
 | Query | Trials | Unique Resp | Consistency | P50 (s) | P95 (s) | P99 (s) | Mean (s) | Std (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| what is the total sales for item 1 in store 1… | 5 | 5 | 20% | 0.974 | 1.02 | 1.022 | 0.961 | 0.068 |
-| how many rows are in the dataset… | 5 | 5 | 20% | 9.052 | 9.185 | 9.199 | 8.25 | 1.678 |
-| forecast demand for item 1 in store 1… | 3 | 3 | 33% | 12.882 | 12.969 | 12.977 | 12.764 | 0.239 |
-| check inventory status for item 3 store 2… | 3 | 3 | 33% | 16.273 | 16.293 | 16.295 | 16.272 | 0.019 |
+| what is the total sales for item 1 in store 1… | 5 | 5 | 20% | 1.39 | 1.658 | 1.71 | 1.277 | 0.302 |
+| how many rows are in the dataset… | 5 | 5 | 20% | 12.167 | 12.302 | 12.316 | 11.803 | 0.801 |
+| forecast demand for item 1 in store 1… | 3 | 3 | 33% | 14.344 | 14.439 | 14.448 | 14.352 | 0.077 |
+| check inventory status for item 3 store 2… | 3 | 3 | 33% | 19.463 | 19.485 | 19.488 | 19.415 | 0.086 |
 
 > **Interpretation**: Although textual responses vary due to inherent LLM stochasticity, the underlying structured numerical outputs remain stable. Surface-level text variability does not impact analytical correctness.
 
@@ -27,86 +27,86 @@ $$\text{Precision} = \frac{\text{Correct Structured Outputs}}{\text{Total Evalua
 
 **Overall Precision**: **72.0%** across **40 queries**
 
-**Latency**: P50=9.436s | P95=12.961s | **P99=15.802s** | Mean=9.766s | Std=2.56s
+**Latency**: P50=12.902s | P95=14.543s | **P99=17.708s** | Mean=12.114s | Std=3.359s
 
 ### 2a. Numerical Stability
 
 Queries where the expected output is a **specific number** computed deterministically via Pandas.
 
-**Numerical Precision**: **12/21** (57.1%)
+**Numerical Precision**: **11/21** (52.4%)
 
 | Category | Queries | Correct | Accuracy |
 | :--- | :---: | :---: | :---: |
-| Count | 5 | 4 | 80% |
+| Count | 5 | 3 | 60% |
 | Stats | 9 | 3 | 33% |
 | Sum | 7 | 5 | 71% |
 
 | Query | Expected | Match | Latency (s) |
 | :--- | :--- | :---: | :---: |
-| How many rows are in the dataset? | 10000 | ✅ | 9.359 |
-| How many unique items are in the dataset? | 20 | ✅ | 8.929 |
-| How many stores are in the dataset? | 5 | ✅ | 8.98 |
-| How many records exist for item 1 in store 1? | 100 | ❌ | 11.277 |
-| How many different items does store 1 carry? | 20 | ✅ | 9.289 |
-| What is the average demand across all items? | 16.5 | ✅ | 9.508 |
-| What is the maximum daily sales value in the dataset? | 30 | ✅ | 8.925 |
-| What is the total sales across all stores? | 150073 | ❌ | 9.271 |
-| Total sales for store 1 | 30098 | ❌ | 8.959 |
-| What are total sales for store 2? | 29904 | ❌ | 9.88 |
-| Total sales in store 3 | 29865 | ❌ | 8.935 |
-| Total sales for item 1 across all stores | 7643 | ❌ | 9.098 |
-| What are the total sales for item 5? | 7396 | ✅ | 9.358 |
-| Sum of all sales of item 10 | 7435 | ❌ | 9.364 |
-| What is the total sum of daily sales for item 1 in stor | 1565 | ✅ | 11.481 |
-| What is the total daily sales for item 5 in store 3? | 1437 | ✅ | 11.407 |
-| Total daily sales for item 2 in store 1 | 1616 | ✅ | 11.555 |
-| What are total sales for item 3 in store 2? | 1494 | ✅ | 11.19 |
-| Sum of daily sales for item 10 store 4 | 1516 | ✅ | 11.146 |
-| Calculate total daily sales for item 1 at store 2 | 1510 | ❌ | 11.522 |
-| Show total sales for item 7 in store 5 | 1444 | ❌ | 10.424 |
+| How many rows are in the dataset? | 10000 | ❌ | 12.163 |
+| How many unique items are in the dataset? | 20 | ✅ | 12.108 |
+| How many stores are in the dataset? | 5 | ✅ | 12.035 |
+| How many records exist for item 1 in store 1? | 100 | ❌ | 14.24 |
+| How many different items does store 1 carry? | 20 | ✅ | 12.34 |
+| What is the average demand across all items? | 16.5 | ✅ | 12.402 |
+| What is the maximum daily sales value in the dataset? | 30 | ✅ | 12.143 |
+| What is the total sales across all stores? | 150073 | ❌ | 12.118 |
+| Total sales for store 1 | 30098 | ❌ | 11.983 |
+| What are total sales for store 2? | 29904 | ❌ | 12.057 |
+| Total sales in store 3 | 29865 | ❌ | 12.133 |
+| Total sales for item 1 across all stores | 7643 | ❌ | 13.379 |
+| What are the total sales for item 5? | 7396 | ❌ | 12.488 |
+| Sum of all sales of item 10 | 7435 | ✅ | 12.377 |
+| What is the total sum of daily sales for item 1 in stor | 1565 | ✅ | 14.651 |
+| What is the total daily sales for item 5 in store 3? | 1437 | ✅ | 13.317 |
+| Total daily sales for item 2 in store 1 | 1616 | ❌ | 14.301 |
+| What are total sales for item 3 in store 2? | 1494 | ✅ | 14.268 |
+| Sum of daily sales for item 10 store 4 | 1516 | ✅ | 14.417 |
+| Calculate total daily sales for item 1 at store 2 | 1510 | ✅ | 14.269 |
+| Show total sales for item 7 in store 5 | 1444 | ❌ | 13.618 |
 
 ### 2b. Textual Stability
 
 Queries where the expected output is a **keyword or concept** (intent classification, forecast trigger, general knowledge).
 
-**Textual Precision**: **17/19** (89.5%)
+**Textual Precision**: **18/19** (94.7%)
 
 | Category | Queries | Correct | Accuracy |
 | :--- | :---: | :---: | :---: |
 | Forecast | 4 | 4 | 100% |
 | General | 4 | 3 | 75% |
 | Inventory | 6 | 6 | 100% |
-| Knowledge | 5 | 4 | 80% |
+| Knowledge | 5 | 5 | 100% |
 
 | Query | Expected | Match | Latency (s) |
 | :--- | :--- | :---: | :---: |
-| Forecast demand for item 1 in store 1 | forecast | ✅ | 12.846 |
-| Predict sales for item 2 store 3 for next 10 days | forecast | ✅ | 15.142 |
-| What will be the demand for item 5 in store 2 next week | forecast | ✅ | 11.532 |
-| Project demand for item 10 store 4 | forecast | ✅ | 12.466 |
-| What columns are in the dataset? | Date | ✅ | 8.181 |
-| Tell me about the dataset | columns | ✅ | 8.474 |
-| Describe the structure of the uploaded data | columns | ❌ | 11.74 |
-| How many columns are there? | 6 | ✅ | 8.287 |
-| Check inventory status for item 3 at store 2 | ORDER | ✅ | 16.224 |
-| Should I reorder item 3 for store 2? | ORDER | ✅ | 5.743 |
-| Is item 3 at store 2 running low? | ORDER | ✅ | 10.229 |
-| What is the inventory status of item 1 in store 1? | ORDER | ✅ | 12.195 |
-| Do I need to order item 1 for store 1? | ORDER | ✅ | 11.276 |
-| Check if item 5 at store 3 needs restocking | ORDER | ✅ | 11.198 |
-| What is a reorder point? | reorder | ✅ | 5.126 |
-| Explain safety stock | safety | ✅ | 5.142 |
-| What is EOQ? | order | ✅ | 4.903 |
-| What is lead time in inventory management? | lead | ✅ | 5.328 |
-| What is the periodic review system? | review | ❌ | 4.75 |
+| Forecast demand for item 1 in store 1 | forecast | ✅ | 14.424 |
+| Predict sales for item 2 store 3 for next 10 days | forecast | ✅ | 14.537 |
+| What will be the demand for item 5 in store 2 next week | forecast | ✅ | 14.421 |
+| Project demand for item 10 store 4 | forecast | ✅ | 14.518 |
+| What columns are in the dataset? | Date | ✅ | 8.104 |
+| Tell me about the dataset | columns | ✅ | 8.441 |
+| Describe the structure of the uploaded data | columns | ❌ | 13.419 |
+| How many columns are there? | 6 | ✅ | 8.344 |
+| Check inventory status for item 3 at store 2 | ORDER | ✅ | 19.662 |
+| Should I reorder item 3 for store 2? | ORDER | ✅ | 14.345 |
+| Is item 3 at store 2 running low? | ORDER | ✅ | 14.229 |
+| What is the inventory status of item 1 in store 1? | ORDER | ✅ | 14.487 |
+| Do I need to order item 1 for store 1? | ORDER | ✅ | 14.352 |
+| Check if item 5 at store 3 needs restocking | ORDER | ✅ | 14.284 |
+| What is a reorder point? | reorder | ✅ | 5.138 |
+| Explain safety stock | safety | ✅ | 5.175 |
+| What is EOQ? | order | ✅ | 4.856 |
+| What is lead time in inventory management? | lead | ✅ | 4.963 |
+| What is the periodic review system? | review | ✅ | 4.047 |
 
 ### 2c. Latency Distribution
 
 | Query Type | n | Mean (s) | Std (s) | 95% CI |
 | :--- | :---: | :---: | :---: | :--- |
-| Numerical | 21 | 9.993 | 1.057 | [9.541, 10.445] |
-| Textual | 19 | 9.515 | 3.633 | [7.881, 11.149] |
-| **Overall** | **40** | **9.766** | **2.593** | **[8.962, 10.570]** |
+| Numerical | 21 | 12.991 | 0.997 | [12.565, 13.417] |
+| Textual | 19 | 11.145 | 4.699 | [9.032, 13.257] |
+| **Overall** | **40** | **12.114** | **3.402** | **[11.060, 13.168]** |
 
 ---
 
@@ -117,27 +117,27 @@ Input queries were intentionally corrupted with misspellings, capitalization cha
 ### Base Query: *what is the total daily sales of item 1 in store 1*
 | Noisy Query | Success | Latency (s) |
 | :--- | :---: | :---: |
-| wat is the totl dales sal for itme 1 in stor 1 | ✅ | 11.276 |
-| ITEM 1 STORE 1 TOTAL SALES PLS | ✅ | 12.143 |
-| sum of sales for product 1 at location 1 | ✅ | 11.041 |
-| item:1 store:1 sales?? | ✅ | 11.308 |
-| howw much did item 1 sell in store 1 | ✅ | 12.101 |
-| total daily sale item#1 store#1 | ✅ | 11.222 |
+| wat is the totl dales sal for itme 1 in stor 1 | ✅ | 14.079 |
+| ITEM 1 STORE 1 TOTAL SALES PLS | ✅ | 15.139 |
+| sum of sales for product 1 at location 1 | ✅ | 14.02 |
+| item:1 store:1 sales?? | ✅ | 13.149 |
+| howw much did item 1 sell in store 1 | ✅ | 15.169 |
+| total daily sale item#1 store#1 | ✅ | 13.99 |
 
 ### Base Query: *how many items are in the dataset*
 | Noisy Query | Success | Latency (s) |
 | :--- | :---: | :---: |
-| how mny items r in the dataset | ✅ | 9.909 |
-| HOW MANY ITEMS ARE THERE | ✅ | 10.05 |
-| count of unique items in data | ✅ | 10.145 |
-| number of products in the dataset | ✅ | 10.908 |
+| how mny items r in the dataset | ✅ | 12.162 |
+| HOW MANY ITEMS ARE THERE | ✅ | 13.049 |
+| count of unique items in data | ✅ | 13.167 |
+| number of products in the dataset | ✅ | 13.092 |
 
 ### Base Query: *check inventory status for item 3 at store 2*
 | Noisy Query | Success | Latency (s) |
 | :--- | :---: | :---: |
-| chck inventery status item 3 stor 2 | ✅ | 11.093 |
-| is item 3 at store 2 low on stock?? | ✅ | 11.362 |
-| item3 store2 stock level check | ✅ | 11.214 |
+| chck inventery status item 3 stor 2 | ✅ | 14.043 |
+| is item 3 at store 2 low on stock?? | ✅ | 15.182 |
+| item3 store2 stock level check | ✅ | 13.019 |
 
 **Overall Noise Tolerance**: 13/13 (100%)
 
@@ -147,28 +147,28 @@ Input queries were intentionally corrupted with misspellings, capitalization cha
 
 **Classification Accuracy**: **100.0%** (18 tests)
 
-**End-to-end Latency**: P50=9.438s | P95=12.289s | **P99=12.959s** | Std=2.428s
+**End-to-end Latency**: P50=12.898s | P95=14.211s | **P99=14.285s** | Std=3.696s
 
 | Query | Expected | Actual | Correct | Classify (s) | Total (s) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| What is the total sales for item 1 in store 1? | SQL | SQL | ✅ | 1.415 | 13.126 |
-| How many rows are in the dataset? | SQL | SQL | ✅ | 1.287 | 9.08 |
-| Show me the top 5 items by sales | SQL | SQL | ✅ | 1.305 | 11.378 |
-| Which store has the highest demand? | SQL | SQL | ✅ | 1.312 | 10.116 |
-| What is the average daily sales across all stores? | SQL | SQL | ✅ | 1.282 | 9.795 |
-| List all items in store 2 | SQL | SQL | ✅ | 1.283 | 11.367 |
-| Total quantity for item 10 in store 4 | SQL | SQL | ✅ | 1.283 | 12.141 |
-| How many records exist for store 3? | SQL | SQL | ✅ | 1.275 | 10.176 |
-| What is the maximum demand value? | SQL | SQL | ✅ | 1.284 | 10.013 |
-| Calculate total sales for item 5 | SQL | SQL | ✅ | 1.437 | 9.866 |
-| What is a reorder point? | LLM | LLM | ✅ | 1.242 | 5.928 |
-| How does safety stock work? | LLM | LLM | ✅ | 1.315 | 6.232 |
-| What inventory management strategy should I use? | LLM | LLM | ✅ | 1.487 | 6.171 |
-| Explain the periodic review system | LLM | LLM | ✅ | 1.281 | 5.976 |
-| What are the best practices for demand forecasting | LLM | LLM | ✅ | 1.308 | 6.676 |
-| How can I reduce stockouts? | LLM | LLM | ✅ | 1.283 | 6.08 |
-| What is the difference between continuous and peri | LLM | LLM | ✅ | 1.323 | 6.106 |
-| Tell me about ABC analysis | LLM | LLM | ✅ | 1.299 | 6.156 |
+| What is the total sales for item 1 in store 1? | SQL | SQL | ✅ | 1.475 | 14.195 |
+| How many rows are in the dataset? | SQL | SQL | ✅ | 1.355 | 13.017 |
+| Show me the top 5 items by sales | SQL | SQL | ✅ | 1.313 | 12.882 |
+| Which store has the highest demand? | SQL | SQL | ✅ | 1.283 | 13.095 |
+| What is the average daily sales across all stores? | SQL | SQL | ✅ | 1.31 | 12.971 |
+| List all items in store 2 | SQL | SQL | ✅ | 1.311 | 14.303 |
+| Total quantity for item 10 in store 4 | SQL | SQL | ✅ | 1.315 | 14.115 |
+| How many records exist for store 3? | SQL | SQL | ✅ | 1.37 | 13.101 |
+| What is the maximum demand value? | SQL | SQL | ✅ | 1.318 | 13.017 |
+| Calculate total sales for item 5 | SQL | SQL | ✅ | 1.318 | 12.913 |
+| What is a reorder point? | LLM | LLM | ✅ | 1.275 | 5.789 |
+| How does safety stock work? | LLM | LLM | ✅ | 1.328 | 5.872 |
+| What inventory management strategy should I use? | LLM | LLM | ✅ | 1.294 | 5.997 |
+| Explain the periodic review system | LLM | LLM | ✅ | 1.288 | 5.875 |
+| What are the best practices for demand forecasting | LLM | LLM | ✅ | 1.321 | 6.397 |
+| How can I reduce stockouts? | LLM | LLM | ✅ | 1.4 | 6.081 |
+| What is the difference between continuous and peri | LLM | LLM | ✅ | 1.43 | 6.001 |
+| Tell me about ABC analysis | LLM | LLM | ✅ | 1.308 | 5.777 |
 
 ---
 
@@ -176,38 +176,24 @@ Input queries were intentionally corrupted with misspellings, capitalization cha
 
 | Metric | NLP Pipeline | Direct LLM |
 | :--- | :---: | :---: |
-| **Accuracy** | 71.0% | 29.0% |
-| Mean Latency (s) | 10.17 | 6.756 |
-| Std Latency (s) | 1.035 | 0.236 |
-| P50 Latency (s) | 10.156 | 6.795 |
-| P95 Latency (s) | 11.324 | 7.07 |
-| **P99 Latency (s)** | **11.386** | **7.095** |
+| **Accuracy** | 71.0% | 43.0% |
+| Mean Latency (s) | 12.715 | 6.745 |
+| Std Latency (s) | 0.743 | 0.203 |
+| P50 Latency (s) | 12.197 | 6.789 |
+| P95 Latency (s) | 13.867 | 6.981 |
+| **P99 Latency (s)** | **14.102** | **6.995** |
 
 ### Per-Query Comparison
 
 | Query | Pipeline Match | Direct Match | Pipeline (s) | Direct (s) |
 | :--- | :---: | :---: | :---: | :---: |
-| What is the total daily sales for item 1 in store  | ✅ | ❌ | 10.156 | 6.795 |
-| How many rows are in the dataset? | ❌ | ✅ | 10.098 | 6.419 |
-| What is the total daily sales for item 3 in store  | ✅ | ❌ | 11.141 | 6.999 |
-| Which store has the most items? | ✅ | ✅ | 10.026 | 6.872 |
-| What is the average demand across all items? | ❌ | ❌ | 7.946 | 6.534 |
-| What is the total sales for item 5 in store 3? | ✅ | ❌ | 11.402 | 7.101 |
-| How many unique items are in the dataset? | ✅ | ❌ | 10.421 | 6.573 |
-
----
-
-## 6. Ablation Study: Forecasting Models
-
-**Item**: 1 | **Store**: 1 | **Data Points**: 100
-
-| Model | Status | Latency (s) | Predictions (first 5) |
-| :--- | :---: | :---: | :--- |
-| LightGBM (global) | success | 0.018 | [16.6, 16.6, 17.59, 18.83, 20.13] |
-| LightGBM (fitted) | success | 0.093 | [19.59, 19.3, 19.59, 19.59, 17.16] |
-| ARIMA | success | 0.158 | [18.55, 18.79, 18.02, 18.6, 18.33] |
-| Exponential Smoothing | success | 0.025 | [19.06, 19.15, 19.24, 19.33, 19.42] |
-| Moving Average (7-day) | success | 0.0 | [18.07, 18.07, 18.07, 18.07, 18.07] |
+| What is the total daily sales for item 1 in store  | ✅ | ❌ | 13.144 | 6.9 |
+| How many rows are in the dataset? | ❌ | ✅ | 12.118 | 6.419 |
+| What is the total daily sales for item 3 in store  | ✅ | ❌ | 13.18 | 6.938 |
+| Which store has the most items? | ✅ | ✅ | 12.125 | 6.789 |
+| What is the average demand across all items? | ❌ | ❌ | 12.08 | 6.633 |
+| What is the total sales for item 5 in store 3? | ✅ | ❌ | 14.161 | 6.999 |
+| How many unique items are in the dataset? | ✅ | ✅ | 12.197 | 6.537 |
 
 ---
 
@@ -218,11 +204,11 @@ Input queries were intentionally corrupted with misspellings, capitalization cha
 | Consistency | Mean Score | 26.5% | 4 |
 | | Std Dev | 7.5% | |
 | Precision | Overall | 72.0% | 40 |
-| | Numerical Stability | 57.1% | 21 |
-| | Textual Stability | 89.5% | 19 |
+| | Numerical Stability | 52.4% | 21 |
+| | Textual Stability | 94.7% | 19 |
 | Noise Tolerance | Success Rate | 100% | 13 |
 | Tool Classification | Accuracy | 100.0% | 18 |
 | Pipeline vs Direct | Pipeline Accuracy | 71.0% | 7 |
-| | Direct LLM Accuracy | 29.0% | 7 |
+| | Direct LLM Accuracy | 43.0% | 7 |
 
 > **Note**: GPU metrics are not applicable. LLM inference is offloaded to Groq's cloud-hosted LPU hardware. All local compute is CPU-only.

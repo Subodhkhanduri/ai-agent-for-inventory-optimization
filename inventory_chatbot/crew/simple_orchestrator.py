@@ -138,12 +138,6 @@ class SimpleInventoryOrchestrator:
             if any(word in query_lower for word in ["status", "stock", "reorder", "rop", "inventory"]):
                 inventory_result = self._execute_inventory_status(query)
             
-            # Always compute T/Ss/Q if item+store are identifiable (for any query type)
-            if inventory_result is None:
-                item, store = self._extract_item_store(query)
-                if item is not None and store is not None:
-                    inventory_result = self._execute_inventory_status(query)
-            
             # Step 3: Generate response using LLM
             final_response = self._generate_response(
                 query=query,
@@ -177,14 +171,14 @@ class SimpleInventoryOrchestrator:
 Query: {query}
 
 Categories:
-- SQL: Questions about data (counts, sums, filters, specific items/stores, averages, comparisons, listings, trends from data)
-- LLM: General advice, explanations, recommendations, "how to" questions, forecasting strategy, business advice
+- SQL: Questions about data (counts, sums, records, filters, specific items/stores, averages, comparisons, listings, trends from data)
+- LLM: General advice, explanations, recommendations, "how to" questions, forecasting strategy, business advice, what is
 
 Rules:
 - If asking for DATA from the inventory → SQL
-- If asking for ADVICE or EXPLANATION → LLM
+- If asking "how many", "show me", "which stores", "total sales", "sum", "records exist" → SQL
+- If asking for ADVICE or EXPLANATION (e.g. "what is EOQ", "how does safety stock work") → LLM
 - If asking "what should I do" → LLM
-- If asking "how many", "show me", "which stores", "total sales" → SQL
 
 Respond with ONLY: SQL or LLM"""
             
@@ -481,24 +475,25 @@ Based on the above information about the user's uploaded inventory dataset, gene
 
 FORMATTING GUIDELINES:
 
-1. **For Inventory Status (Periodic Review)**:
+1. **For Data / SQL Queries**:
+   - If a SQL Query Result is provided, explicitly state the direct answer to the user's question first (e.g., "The total sales are X", "There are Y rows").
+   - Do NOT wrap data answers in an "Inventory Analysis" or "Periodic Review" format. Just answer the specific question asked.
+
+2. **For Inventory Status (Periodic Review)** (ONLY if Inventory Status Check is provided):
    - Use a clear header like **Inventory Analysis**
    - Use emojis to indicate status: 🟢 (Healthy), ⚠️ (Low Stock), 🔴 (Order Required)
    - Explicitly state: **Current Stock: X** vs **Target Stock (T): Y**
    - Show: **Safety Stock (Ss): Z** and **Order Quantity (Q): W**
    - Provide a clear recommendation: **Action: [Place Order for Q units / No Action Needed]**
-   - Box the key conclusion or recommendation if possible
 
-2. **For Forecast Queries**:
+3. **For Forecast Queries**:
    - State the model used (e.g., "Forecast generated using LightGBM")
    - Summarize the trend (increasing, decreasing, stable)
-   - detailed daily predictions are available in the table/chart, so just summarize the next 3-5 days
    - Use a bullet list for key insights
 
-3. **General Rules**:
-   - **Conciseness**: Avoid repetitive phrases like "Based on the provided data". Get straight to the point.
-   - **Structure**: Use markdown headers, bold text for numbers, and bullet points.
-   - **Tone**: Professional, confident, and action-oriented.
+4. **General Rules**:
+   - **Conciseness**: Get straight to the point.
+   - **Tone**: Professional and confident.
 """
             
             messages = [{"role": "user", "content": prompt}]

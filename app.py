@@ -45,9 +45,20 @@ else:
     # Or just run it - it's fast enough.
     
     with st.expander("⚠️ Critical Inventory Alerts (1-Week Periodic Review)", expanded=True):
-        if "inventory_alerts" not in st.session_state or st.session_state.last_uploaded != uploaded_file.name:
+        col1, col2 = st.columns(2)
+        with col1:
+            ui_lead_time = st.slider("Lead Time (Days)", 1, 30, 7, help="Estimated days for supplier restocks to arrive.")
+        with col2:
+            ui_service_options = {"Conservative (90% availability)": 1.28, "Standard (95% availability)": 1.65, "Aggressive (99% availability)": 2.33}
+            ui_service = st.selectbox("Service Level Strategy", list(ui_service_options.keys()), index=1, help="Buffer margin against variance in demand.")
+            ui_service_level = ui_service_options[ui_service]
+            
+        settings_key = f"{uploaded_file.name}-{ui_lead_time}-{ui_service_level}"
+
+        if "inventory_alerts" not in st.session_state or st.session_state.get("last_settings_key") != settings_key:
             with st.spinner("Analyzing inventory risks..."):
-                alerts_data = APIClient.get_periodic_review(session_id)
+                st.session_state.last_settings_key = settings_key
+                alerts_data = APIClient.get_periodic_review(session_id, ui_lead_time, ui_service_level)
                 if "error" in alerts_data:
                     st.error(f"Failed to load alerts: {alerts_data['error']}")
                     st.session_state.inventory_alerts = None
@@ -62,8 +73,14 @@ else:
             
             if not critical_items.empty:
                 st.error(f"🚨 Action Required: {len(critical_items)} items need restocking!")
+                
+                # Check for ROP in columns to support legacy session state caches safely
+                cols_to_show = ["Item", "Store", "Current Stock", "Target Level (T)", "Order Qty (Q)", "Status"]
+                if "ROP" in critical_items.columns:
+                    cols_to_show.insert(3, "ROP")
+                
                 st.dataframe(
-                    critical_items[["Item", "Store", "Current Stock", "Target Level (T)", "Order Qty (Q)", "Status"]],
+                    critical_items[cols_to_show],
                     use_container_width=True,
                     hide_index=True
                 )

@@ -1,0 +1,57 @@
+Debugging failed queries...
+
+--- FAILED ---
+Query: Check inventory status for item 3 at store 2
+Expected: ORDER
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: Should I reorder item 3 for store 2?
+Expected: ORDER
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: Predict sales for item 2 store 3 for next 10 days
+Expected: forecast
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: What will be the demand for item 5 in store 2 next week?
+Expected: forecast
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: Project demand for item 10 store 4
+Expected: forecast
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: What columns are in the dataset?
+Expected: Date
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: Tell me about the dataset
+Expected: columns
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.
+
+--- FAILED ---
+Query: Describe the structure of the uploaded data
+Expected: columns
+SQL Generated: NO SQL
+Actual Response:
+Generated results but couldn't format response: Connection error.

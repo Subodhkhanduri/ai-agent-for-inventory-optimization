@@ -104,10 +104,32 @@ DATABASE SCHEMA:
 RULES:
 1. Use ONLY SELECT statements (no INSERT, UPDATE, DELETE, DROP)
 2. Use the exact column names from the schema
-3. Return ONLY the SQL query, no explanations
+3. Return ONLY the SQL query, no explanations or markdown formatting
 4. Use proper SQLite syntax
-5. For aggregations, use appropriate GROUP BY clauses
-6. Handle case-insensitive string matching with LOWER()
+5. COLUMN MAPPING RULES:
+   - If asked for "sales" or "total sales", always aggregate the `Daily_Sales` column (e.g., SUM(Daily_Sales)). DO NOT sum Quantity.
+   - If asked for "demand", aggregate the `Demand` column.
+   - If asked for "quantity", aggregate the `Quantity` column.
+6. FILTERING INFERENCE:
+   - If a query mentions specific IDs like "item 1", "store 2", ensure you include `WHERE Item = 1 AND Store = 2`.
+7. AGGREGATION ALIGNMENT:
+   - For aggregations (SUM, AVG, MIN, MAX), ensure proper GROUP BY clauses for any non-aggregated selected columns.
+8. COUNTING:
+   - "How many stores" -> COUNT(DISTINCT Store)
+   - "How many items" -> COUNT(DISTINCT Item)
+
+EXAMPLES:
+Query: "What is the total sum of daily sales for item 1 in store 1?"
+SQL: SELECT SUM(Daily_Sales) FROM inventory WHERE Item = 1 AND Store = 1;
+
+Query: "What is the average demand across all items?"
+SQL: SELECT AVG(Demand) FROM inventory;
+
+Query: "How many different items does store 1 carry?"
+SQL: SELECT COUNT(DISTINCT Item) FROM inventory WHERE Store = 1;
+
+Query: "What are the total sales for store 2?"
+SQL: SELECT SUM(Daily_Sales) FROM inventory WHERE Store = 2;
 
 USER QUERY: {natural_query}
 

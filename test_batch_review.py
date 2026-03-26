@@ -6,9 +6,9 @@ def test_batch_review():
     # Setup dummy data for multiple items
     data = {
         "Date": pd.date_range(start="2023-01-01", periods=10).tolist() * 2,
-        "item": [1] * 10 + [2] * 10,
-        "store": [1] * 10 + [1] * 10,
-        "Daily_Sales": [10] * 10 + [5] * 10,
+        "Item": [1] * 10 + [2] * 10,
+        "Store": [1] * 10 + [1] * 10,
+        "Demand": [10] * 10 + [5] * 10,
         "Quantity": [50] * 10 + [100] * 10 
     }
     df = pd.DataFrame(data)
