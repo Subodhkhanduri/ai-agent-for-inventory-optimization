@@ -217,3 +217,5 @@ docker-compose.override.yml
 !.gitkeep
 !.env.example
 !.env.template
+!assets/
+!assets/**

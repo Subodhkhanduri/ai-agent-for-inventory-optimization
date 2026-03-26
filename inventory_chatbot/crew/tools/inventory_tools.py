@@ -13,6 +13,7 @@ class InventoryStatusInput(BaseModel):
     review_period: int = Field(default=7, description="Review Period (P) in days")
     order_process_time: int = Field(default=1, description="Order Processing Time in days")
     transit_time: int = Field(default=6, description="Transit Time in days")
+    lead_time_std: float = Field(default=0.0, description="Standard Deviation of Lead Time in days")
     stock_on_order: float = Field(default=0.0, description="Stock currently on order")
     forecasted_daily_demand: float = Field(default=None, description="Optional: Manually provide daily demand forecast")
 
@@ -29,6 +30,7 @@ class InventoryStatusTool(BaseTool):
              review_period: int = 7,
              order_process_time: int = 1,
              transit_time: int = 6,
+             lead_time_std: float = 0.0,
              stock_on_order: float = 0.0,
              forecasted_daily_demand: float = None) -> Any:
         """Calculate inventory status."""
@@ -45,7 +47,8 @@ class InventoryStatusTool(BaseTool):
             review_period_days=review_period,
             lead_time_days=lead_time_days,
             stock_on_order=stock_on_order,
-            forecasted_daily_demand=forecasted_daily_demand
+            forecasted_daily_demand=forecasted_daily_demand,
+            lead_time_std=lead_time_std
         )
         
         if "error" in result:

@@ -59,12 +59,12 @@ class APIClient:
             return {"error": str(e)}
 
     @staticmethod
-    def get_periodic_review(session_id, lead_time=7, service_level=1.65):
+    def get_periodic_review(session_id, lead_time=7, service_level=1.65, lead_time_std=0.0):
         """Get batch inventory review."""
         try:
             response = requests.post(
                 f"{BACKEND_URL}/inventory/periodic-review",
-                data={"session_id": session_id, "lead_time": lead_time, "service_level": service_level},
+                data={"session_id": session_id, "lead_time": lead_time, "service_level": service_level, "lead_time_std": lead_time_std},
                 headers=APIClient.get_headers(),
             )
             return response.json()

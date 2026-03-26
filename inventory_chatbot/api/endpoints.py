@@ -176,7 +176,8 @@ async def ask_question(request: Request):
 async def get_periodic_review(
     session_id: str = Form(...),
     lead_time: int = Form(7),
-    service_level: float = Form(1.65)
+    service_level: float = Form(1.65),
+    lead_time_std: float = Form(0.0)
 ):
     """
     Get batch periodic review for all items in the session dataset.
@@ -189,7 +190,7 @@ async def get_periodic_review(
         from inventory_chatbot.analytics.inventory_calculator import calculate_batch_periodic_review
         
         # Run calculation
-        results_df = calculate_batch_periodic_review(df, lead_time_days=lead_time, service_level=service_level)
+        results_df = calculate_batch_periodic_review(df, lead_time_days=lead_time, service_level=service_level, lead_time_std=lead_time_std)
         
         if results_df.empty:
             return {"status": "empty", "data": []}

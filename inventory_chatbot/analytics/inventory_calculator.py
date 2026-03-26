@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def calculate_rop_status(df: pd.DataFrame, item: int, store: int, 
 
-                         lead_time: int = 7, service_level: float = 1.65) -> Dict[str, Any]:
+                         lead_time: int = 7, service_level: float = 1.65, lead_time_std: float = 0.0) -> Dict[str, Any]:
 
     """
 
@@ -90,11 +90,13 @@ def calculate_rop_status(df: pd.DataFrame, item: int, store: int,
 
         # 3. Compute ROP
 
-        # ROP = (μ * L) + (Z * σ * sqrt(L))
+        # ROP = (μ * L) + Z * sqrt(L * σ_d^2 + μ^2 * σ_L^2)
 
-        lead_time_sqrt = math.sqrt(lead_time)
+        variance_term = (lead_time * (sigma ** 2)) + ((mu ** 2) * (lead_time_std ** 2))
 
-        rop = (mu * lead_time) + (service_level * sigma * lead_time_sqrt)
+        std_dev_combined = math.sqrt(max(0, variance_term))
+
+        rop = (mu * lead_time) + (service_level * std_dev_combined)
 
         
 
@@ -186,7 +188,9 @@ def calculate_periodic_review_status(df: pd.DataFrame, item: int, store: int,
 
                                      stock_on_order: float = 0.0,
 
-                                     forecasted_daily_demand: float = None) -> Dict[str, Any]:
+                                     forecasted_daily_demand: float = None,
+
+                                     lead_time_std: float = 0.0) -> Dict[str, Any]:
 
     r"""
 
@@ -318,13 +322,13 @@ def calculate_periodic_review_status(df: pd.DataFrame, item: int, store: int,
 
         # 4. Calculate Safety Stock ($Ss$)
 
-        # $\sigma_{P+L} = \sqrt{P + L} \times \sigma_d$
+        # $Ss = Z \times \sqrt{(P+L)\sigma_d^2 + \mu_d^2\sigma_L^2}$
 
-        sigma_protection_interval = math.sqrt(protection_interval) * sigma_d
+        variance_protection = (protection_interval * (sigma_d ** 2)) + ((mu_d ** 2) * (lead_time_std ** 2))
+
+        sigma_protection_interval = math.sqrt(max(0, variance_protection))
 
         
-
-        # $Ss = Z \times \sigma_{P+L}$
 
         safety_stock = service_level * sigma_protection_interval
 
@@ -395,7 +399,11 @@ def calculate_periodic_review_status(df: pd.DataFrame, item: int, store: int,
         
 
         # Calculate ROP
-        sigma_lead_time = math.sqrt(L) * sigma_d
+
+        variance_lead_time = (L * (sigma_d ** 2)) + ((mu_d ** 2) * (lead_time_std ** 2))
+
+        sigma_lead_time = math.sqrt(max(0, variance_lead_time))
+
         rop = (mu_d * L) + (service_level * sigma_lead_time)
         needs_reorder_rop = inventory_position < rop
 
@@ -463,7 +471,7 @@ def calculate_periodic_review_status(df: pd.DataFrame, item: int, store: int,
 
 
 
-def calculate_batch_periodic_review(df: pd.DataFrame, review_period_days: int = 7, lead_time_days: int = 7, service_level: float = 1.65) -> pd.DataFrame:
+def calculate_batch_periodic_review(df: pd.DataFrame, review_period_days: int = 7, lead_time_days: int = 7, service_level: float = 1.65, lead_time_std: float = 0.0) -> pd.DataFrame:
     """
     Run Periodic Review System calculation for ALL items in the DataFrame.
     Returns a summary DataFrame with key metrics, sorted by urgency.
@@ -483,7 +491,8 @@ def calculate_batch_periodic_review(df: pd.DataFrame, review_period_days: int = 
             store=pair["Store"],
             review_period_days=review_period_days,
             lead_time_days=lead_time_days,
-            service_level=service_level
+            service_level=service_level,
+            lead_time_std=lead_time_std
         )
 
         
