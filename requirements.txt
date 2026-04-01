@@ -13,8 +13,8 @@ passlib[bcrypt]
 
 # ── LLM & AI ──
 groq>=0.4.0
-crewai==0.86.0
-crewai-tools==0.17.0
+crewai==0.11.2
+crewai-tools==0.1.6
 langchain==0.3.18
 langchain-groq==0.2.5
 
