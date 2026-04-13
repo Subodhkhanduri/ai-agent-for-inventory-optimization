@@ -208,3 +208,43 @@ async def get_periodic_review(
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
+# ==========================================================
+# INVENTORY COMPARISON (Fixed vs Uncertain Lead Time)
+# ==========================================================
+@router.post("/inventory/compare-lead-times")
+async def compare_lead_times(
+    session_id: str = Form(...),
+    lead_time: int = Form(7),
+    service_level: float = Form(1.65),
+    lead_time_std: float = Form(None)  # Optional, will use historical if None
+):
+    """
+    Compare Fixed vs Uncertain Lead Time scenarios.
+    """
+    df = get_session_dataframe(session_id)
+    if df is None:
+        return JSONResponse({"error": "No dataset found"}, status_code=404)
+        
+    try:
+        from inventory_chatbot.analytics.inventory_calculator import compare_lead_time_scenarios
+        
+        # Run comparison
+        result = compare_lead_time_scenarios(
+            df, 
+            lead_time_days=lead_time, 
+            service_level=service_level, 
+            user_lead_time_std=lead_time_std
+        )
+        
+        if "error" in result:
+            return JSONResponse({"error": result["error"]}, status_code=400)
+            
+        return {
+            "status": "success", 
+            "comparison": result
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)

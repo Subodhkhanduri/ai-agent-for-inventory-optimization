@@ -103,6 +103,49 @@ else:
         else:
              st.info("No inventory data available for analysis.")
 
+    with st.expander("⚖️ Strategy Comparison: Fixed vs. Uncertain Lead Time", expanded=True):
+        if st.session_state.get("inventory_alerts"):
+            with st.spinner("Comparing strategies..."):
+                comp_data = APIClient.get_lead_time_comparison(session_id, ui_lead_time, ui_service_level, ui_lead_time_std)
+                
+                if "error" in comp_data:
+                    st.error(f"Comparison failed: {comp_data.get('error', 'Unknown error')}")
+                else:
+                    comparison = comp_data.get("comparison", {})
+                    summary = comparison.get("summary", {})
+                    items = comparison.get("item_comparison", [])
+                    
+                    if not items:
+                        st.info("No items to compare.")
+                    else:
+                        df_comp = pd.DataFrame(items)
+                        
+                        # 1. Recommendation Alert
+                        if "Uncertain" in summary.get("recommendation", ""):
+                            st.info(f"💡 **Recommendation: {summary['recommendation']}**\n\n{summary['justification']}")
+                        else:
+                            st.success(f"✅ **Recommendation: {summary.get('recommendation', 'Fixed Lead Time')}**\n\n{summary.get('justification', '')}")
+                        
+                        # 2. High-level Metrics
+                        m1, m2, m3 = st.columns(3)
+                        avg_ss_fixed = df_comp["Safety Stock_fixed"].mean()
+                        avg_ss_unc = df_comp["Safety Stock_uncertain"].mean()
+                        ss_diff = ((avg_ss_unc - avg_ss_fixed) / avg_ss_fixed * 100) if avg_ss_fixed > 0 else 0
+                        
+                        m1.metric("Historical Lead Time StdDev", f"{summary.get('historical_std', 0)} days")
+                        m2.metric("Avg Safety Stock (Fixed)", f"{avg_ss_fixed:.1f}")
+                        m3.metric("Avg Safety Stock (Uncertain)", f"{avg_ss_unc:.1f}", f"+{ss_diff:.1f}% cost" if ss_diff > 0 else "0%")
+                        
+                        # 3. Detailed Comparison table
+                        st.subheader("Item-by-Item Comparison")
+                        display_df = df_comp[["Item", "Store", "Safety Stock_fixed", "Safety Stock_uncertain", "Status_fixed", "Status_uncertain"]].copy()
+                        display_df.columns = ["Item", "Store", "SS (Fixed)", "SS (Uncertain)", "Status (Fixed)", "Status (Uncertain)"]
+                        display_df["SS Increase"] = display_df["SS (Uncertain)"] - display_df["SS (Fixed)"]
+                        
+                        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Upload data to see strategy comparison.")
+
     st.divider()
 
     # 1. SHOW PREVIOUS MESSAGES

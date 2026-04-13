@@ -469,6 +469,113 @@ def calculate_periodic_review_status(df: pd.DataFrame, item: int, store: int,
 
         return {"error": str(e)}
 
+def estimate_historical_lead_time(df: pd.DataFrame) -> Dict[str, float]:
+    """
+    Estimate the mean and standard deviation of lead time from historical data.
+    Assumes that Arrived_Qty corresponds to a previous Ordered_Qty.
+    """
+    if "Ordered_Qty" not in df.columns or "Arrived_Qty" not in df.columns or "Date" not in df.columns:
+        return {"mean_lead_time": 7.0, "std_lead_time": 0.0}
+
+    # Ensure Date is datetime
+    if not pd.api.types.is_datetime64_any_dtype(df["Date"]):
+        df = df.copy()
+        df["Date"] = pd.to_datetime(df["Date"])
+
+    lead_times = []
+    
+    # Process each item-store pair
+    for (item, store), group in df.groupby(["Item", "Store"]):
+        group = group.sort_values("Date")
+        
+        # Get dates where orders were placed and arrived
+        order_dates = group[group["Ordered_Qty"] > 0]["Date"].tolist()
+        arrival_dates = group[group["Arrived_Qty"] > 0]["Date"].tolist()
+        
+        # Simple matching: n-th arrival matches n-th order
+        # We need to find the subset that matches
+        # If the first arrival happened before the first recorded order, skip it (it was from before the data starts)
+        if not order_dates or not arrival_dates:
+            continue
+            
+        # Strip arrival dates that are before the first order date
+        arrival_dates = [d for d in arrival_dates if d > order_dates[0]]
+        
+        # Match FIFO
+        for i in range(min(len(order_dates), len(arrival_dates))):
+            diff = (arrival_dates[i] - order_dates[i]).days
+            if diff > 0:
+                lead_times.append(diff)
+
+    if not lead_times:
+        return {"mean_lead_time": 7.0, "std_lead_time": 0.0}
+
+    arr = pd.Series(lead_times)
+    return {
+        "mean_lead_time": round(float(arr.mean()), 2),
+        "std_lead_time": round(float(arr.std()), 2) if len(arr) > 1 else 0.0
+    }
+
+def compare_lead_time_scenarios(df: pd.DataFrame, lead_time_days: int = 7, service_level: float = 1.65, user_lead_time_std: float = None) -> Dict[str, Any]:
+    """
+    Compare Fixed Lead Time (std=0) vs Uncertain Lead Time.
+    Returns comparison summary and item-level details.
+    """
+    # 1. Estimate from data
+    historical_stats = estimate_historical_lead_time(df)
+    
+    # Use user input if provided, otherwise use historical
+    comparison_std = user_lead_time_std if user_lead_time_std is not None else historical_stats["std_lead_time"]
+    
+    # 2. Run Batch Calculations
+    # Fixed Scenario
+    df_fixed = calculate_batch_periodic_review(df, lead_time_days=lead_time_days, service_level=service_level, lead_time_std=0.0)
+    
+    # Uncertain Scenario
+    df_uncertain = calculate_batch_periodic_review(df, lead_time_days=lead_time_days, service_level=service_level, lead_time_std=comparison_std)
+    
+    if df_fixed.empty or df_uncertain.empty:
+        return {"error": "Insufficient data for comparison"}
+
+    # 3. Aggregate Summary Metrics
+    # We need Safety Stock and Target Level which are NOT in the batch summary by default?
+    # Let's re-calculate more details for the summary if needed, but let's check calculate_batch_periodic_review return
+    
+    # Wait, calculate_batch_periodic_review only returns Item, Store, Current Stock, ROP, Target Level, Order Qty, Status.
+    # It doesn't return Safety Stock. I should probably update it or re-calculate summary here.
+    
+    # 4. Item-level comparison
+    comparison_details = []
+    total_ss_fixed = 0
+    total_ss_uncertain = 0
+    
+    # Join the two dataframes to compare
+    merge_df = pd.merge(df_fixed, df_uncertain, on=["Item", "Store"], suffixes=("_fixed", "_uncertain"))
+    
+    # We need Safety Stock specifically. I'll re-calculate it for each item to be precise.
+    # Or I can update calculate_batch_periodic_review. Let's update calculate_batch_periodic_review to include SS.
+    
+    # For now, let's just use what we have and re-derive SS if needed, 
+    # but the user wants "Fixed Safety Stock, Uncertain Safety Stock" in the table.
+    # So I MUST update calculate_batch_periodic_review or calculate it here.
+    
+    return {
+        "summary": {
+            "fixed_std": 0.0,
+            "uncertain_std": comparison_std,
+            "historical_std": historical_stats["std_lead_time"],
+            "total_items": len(merge_df),
+            "recommendation": "Uncertain Lead Time (Stochastic)" if comparison_std > 0 else "Fixed Lead Time (Deterministic)",
+            "justification": (
+                f"With a lead time variability of {comparison_std} days, the Uncertain model is safer. "
+                "It accounts for supply delays, reducing stockout risk at the cost of higher safety stock."
+                if comparison_std > 0 else 
+                "No lead time variability detected. The Fixed model is optimal as it avoids unnecessary holding costs."
+            )
+        },
+        "item_comparison": merge_df.to_dict(orient="records")
+    }
+
 
 
 def calculate_batch_periodic_review(df: pd.DataFrame, review_period_days: int = 7, lead_time_days: int = 7, service_level: float = 1.65, lead_time_std: float = 0.0) -> pd.DataFrame:
@@ -506,6 +613,7 @@ def calculate_batch_periodic_review(df: pd.DataFrame, review_period_days: int = 
                 "Store": pair["Store"],
 
                 "Current Stock": res["current_on_hand"],
+                "Safety Stock": res["safety_stock_Ss"],
                 "ROP": round(res.get("calculated_rop", 0), 2),
                 "Target Level (T)": res["target_level_T"],
 

@@ -70,3 +70,19 @@ class APIClient:
             return response.json()
         except Exception as e:
             return {"error": str(e)}
+    @staticmethod
+    def get_lead_time_comparison(session_id, lead_time=7, service_level=1.65, lead_time_std=None):
+        """Compare Fixed vs. Uncertain lead time scenarios."""
+        try:
+            data = {"session_id": session_id, "lead_time": lead_time, "service_level": service_level}
+            if lead_time_std is not None:
+                data["lead_time_std"] = lead_time_std
+                
+            response = requests.post(
+                f"{BACKEND_URL}/inventory/compare-lead-times",
+                data=data,
+                headers=APIClient.get_headers(),
+            )
+            return response.json()
+        except Exception as e:
+            return {"error": str(e)}
