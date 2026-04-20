@@ -1,5 +1,10 @@
-
+import os
+import sys
 import pandas as pd
+
+# Ensure we can import from the parent directory
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from inventory_chatbot.analytics.inventory_calculator import calculate_batch_periodic_review
 
 def test_batch_review():

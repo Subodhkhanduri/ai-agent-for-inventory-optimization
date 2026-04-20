@@ -1,4 +1,12 @@
+import os
+import sys
 import pandas as pd
+
+# Ensure we can import from the parent and benchmarks directories
+current_dir = os.path.dirname(__file__)
+sys.path.append(os.path.abspath(os.path.join(current_dir, "..")))
+sys.path.append(os.path.abspath(os.path.join(current_dir, "..", "benchmarks")))
+
 from inventory_chatbot.benchmarks.evaluator import SimpleInventoryOrchestrator
 from run_benchmarks import generate_large_mock_data, build_precision_tests
 

@@ -10,9 +10,13 @@ Usage:
 """
 
 import sys
+import os
 import time
 import logging
 import pandas as pd
+
+# Ensure we can import from the parent directory
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -25,8 +29,9 @@ from inventory_chatbot.benchmarks.inventory_policy_evaluator import (
 
 def main():
     # ── Parse arguments ──
-    train_path = "train_80_date_split.csv"
-    test_path = "test_20_date_split.csv"
+    data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+    train_path = os.path.join(data_dir, "train_80_date_split.csv")
+    test_path = os.path.join(data_dir, "test_20_date_split.csv")
     max_pairs = None
 
     args = sys.argv[1:]
@@ -112,7 +117,7 @@ def main():
 
     # ── Generate Report ──
     report_md = generate_inventory_policy_report(results)
-    report_path = "inventory_policy_report.md"
+    report_path = os.path.join(os.path.dirname(__file__), "..", "docs", "inventory_policy_report.md")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_md)
     print(f"\n[OK] Report saved to: {report_path}")

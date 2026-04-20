@@ -161,42 +161,24 @@ Open **http://localhost:8501** and upload your CSV to start chatting!
 ```
 ai-agent-for-inventory-optimization/
 ├── app.py                          # Streamlit frontend entry point
-├── inventory_chatbot/
+├── inventory_chatbot/              # Core source package
 │   ├── main.py                     # FastAPI app factory
 │   ├── config.py                   # Pydantic settings (from .env)
-│   ├── api/
-│   │   └── endpoints.py            # REST endpoints: /upload, /ask, /periodic-review
-│   ├── crew/
-│   │   ├── simple_orchestrator.py  # Core AI orchestrator (query routing + LLM)
-│   │   ├── config/
-│   │   │   └── tasks.yaml          # Agent task definitions
-│   │   └── tools/
-│   │       ├── sql_query_tool.py   # Text-to-SQL via LLM
-│   │       ├── data_tools.py       # DataFrame query tools
-│   │       ├── forecast_tools.py   # Forecasting tool wrapper
-│   │       ├── inventory_tools.py  # ROP & inventory status
-│   │       └── viz_tools.py        # Visualization generation
-│   ├── analytics/
-│   │   ├── core_analytics.py       # Session-based dataset management
-│   │   ├── forecasting.py          # LightGBM, ARIMA, ETS models
-│   │   ├── inventory_calculator.py # ROP, Periodic Review, EOQ formulas
-│   │   ├── visualization.py        # Matplotlib chart generation
-│   │   └── validator.py            # CSV schema validation
-│   ├── services/
-│   │   ├── llm_service.py          # Groq LLM wrapper with retry & fallback
-│   │   ├── cache_service.py        # Redis / in-memory cache
-│   │   └── auth_service.py         # JWT authentication + RBAC
-│   ├── benchmarks/
-│   │   ├── evaluator.py            # Robustness & precision benchmarks
-│   │   └── reporter.py             # Benchmark report generator
-│   └── frontend/
-│       ├── ui_components.py        # Streamlit sidebar, chat, alerts
-│       └── api_client.py           # Frontend → Backend API client
-├── models/                         # Pre-trained LightGBM model
+│   ├── api/                        # REST endpoints: /upload, /ask
+│   ├── crew/                       # Core AI orchestrator & Agency logic
+│   ├── analytics/                  # Forecasting & Inventory logic
+│   ├── services/                   # LLM, Cache, and Auth services
+│   └── frontend/                   # Streamlit UI components & API client
+├── benchmarks/                     # NEW: Comprehensive evaluation suite
+│   ├── run_benchmarks.py           # Robustness & LLM benchmarking
+│   └── run_inventory_evaluation.py # Inventory policy metrics
+├── data/                           # NEW: Dataset storage (train/test CSVs)
+├── docs/                           # NEW: Reports, thesis results, and academic docs
+├── tools/                          # NEW: Dev utilities and debug scripts
+├── models/                         # Pre-trained LightGBM assets
 ├── requirements.txt
-├── render.yaml                     # Render deployment config
-├── assets/                         # README images
-└── .env.example
+├── render.yaml                     # Deployment configuration
+└── assets/                         # Documentation images
 ```
 
 ---
@@ -231,7 +213,7 @@ Comprehensive evaluation across **40+ queries** with automated benchmarking:
 
 > The full pipeline achieves **+28% higher accuracy** than sending raw queries directly to the LLM — demonstrating that the Text-to-SQL + tool orchestration approach is significantly more reliable.
 
-📄 *Full report: [robustness_report.md](robustness_report.md)*
+📄 *Full report: [docs/robustness_report.md](docs/robustness_report.md)*
 
 ---
 

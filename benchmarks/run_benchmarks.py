@@ -14,11 +14,14 @@ Comprehensive LLM Robustness & Pipeline Stability Benchmarking Suite
 """
 
 import sys
-print("[BOOT] Script starting...", flush=True)
 import os
 import pandas as pd
 import numpy as np
 import logging
+
+# Ensure we can import from the parent directory
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from inventory_chatbot.benchmarks.evaluator import RobustnessEvaluator
 from inventory_chatbot.benchmarks.reporter import generate_benchmarking_report
 
@@ -379,7 +382,8 @@ def main():
         forecast_ablation=fc_res,
     )
 
-    with open("robustness_report.md", "w", encoding="utf-8") as f:
+    report_path = os.path.join(os.path.dirname(__file__), "..", "docs", "robustness_report.md")
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_md)
 
     print(f"\n[DONE] Benchmarking Complete! Tested on {len(df)} rows.")
