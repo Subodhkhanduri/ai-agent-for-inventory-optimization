@@ -18,12 +18,17 @@ import os
 import pandas as pd
 import numpy as np
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env early
+load_dotenv()
 
 # Ensure we can import from the parent directory
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from inventory_chatbot.benchmarks.evaluator import RobustnessEvaluator
 from inventory_chatbot.benchmarks.reporter import generate_benchmarking_report
+from inventory_chatbot.crew.simple_orchestrator import SimpleInventoryOrchestrator
 
 logging.basicConfig(level=logging.WARNING)
 
@@ -293,6 +298,20 @@ def main():
 
     evaluator = RobustnessEvaluator(df)
 
+    # ── Pre-flight API check ──
+    print("Pre-flight check: Verifying Groq API connection...")
+    try:
+        from inventory_chatbot.config import settings
+        if not settings.GROQ_API_KEY:
+             print("ERROR: GROQ_API_KEY not found. Check your .env file.")
+             return
+        test_orch = SimpleInventoryOrchestrator(df.head(5))
+        test_orch._classify_query_type("test")
+        print("API check passed.")
+    except Exception as e:
+        print(f"API check failed: {e}")
+        return
+
     # ── 1. Consistency & P99 Latency (5 trials each) ──
     print("\n[1/6] Running Consistency & P99 Latency Tests (5 trials each)...")
     consistency_queries = [
@@ -303,88 +322,110 @@ def main():
     ]
     consistency_results = []
     for query, trials in consistency_queries:
-        c_res = evaluator.run_consistency_test(query, trials=trials)
-        consistency_results.append(c_res)
-        print(f"  [OK] '{query[:50]}' - Consistency: {c_res['consistency_score']*100:.0f}%, "
-              f"P99: {c_res['latency_stats'].get('p99', 'N/A')}s")
+        try:
+            c_res = evaluator.run_consistency_test(query, trials=trials)
+            consistency_results.append(c_res)
+            print(f"  [OK] '{query[:50]}' - Consistency: {c_res['consistency_score']*100:.0f}%, "
+                  f"P99: {c_res['latency_stats'].get('p99', 'N/A')}s")
+        except Exception as e:
+            print(f"  [ERROR] Consistency test failed for '{query[:30]}': {e}")
 
     # -- 2. Precision (40+ ground-truth queries) --
     print("\n[2/6] Running Precision Tests (40+ queries)...")
-    precision_tests = build_precision_tests(df)
-    p_res = evaluator.run_precision_test(precision_tests)
-    print(f"  [OK] Precision Score: {p_res['precision_score'] * 100:.1f}% ({p_res['total_tests']} tests)")
-    print(f"  [OK] Latency P99: {p_res['latency_stats'].get('p99', 'N/A')}s, "
-          f"Std: {p_res['latency_stats'].get('std', 'N/A')}s")
+    p_res = None
+    try:
+        precision_tests = build_precision_tests(df)
+        p_res = evaluator.run_precision_test(precision_tests)
+        print(f"  [OK] Precision Score: {p_res['precision_score'] * 100:.1f}% ({p_res['total_tests']} tests)")
+        print(f"  [OK] Latency P99: {p_res['latency_stats'].get('p99', 'N/A')}s, "
+              f"Std: {p_res['latency_stats'].get('std', 'N/A')}s")
+    except Exception as e:
+        print(f"  [ERROR] Precision tests failed: {e}")
 
     # Category breakdown
     categories = {}
-    for d in p_res["details"]:
-        cat = d.get("category", "unknown")
-        if cat not in categories:
-            categories[cat] = {"total": 0, "correct": 0}
-        categories[cat]["total"] += 1
-        if d["is_match"]:
-            categories[cat]["correct"] += 1
+    if p_res:
+        for d in p_res["details"]:
+            cat = d.get("category", "unknown")
+            if cat not in categories:
+                categories[cat] = {"total": 0, "correct": 0}
+            categories[cat]["total"] += 1
+            if d["is_match"]:
+                categories[cat]["correct"] += 1
 
-    for cat, counts in sorted(categories.items()):
-        acc = counts["correct"] / counts["total"] * 100
-        print(f"    - {cat}: {acc:.0f}% ({counts['correct']}/{counts['total']})")
+        for cat, counts in sorted(categories.items()):
+            acc = counts["correct"] / counts["total"] * 100
+            print(f"    - {cat}: {acc:.0f}% ({counts['correct']}/{counts['total']})")
 
     # ── 3. Noise / Typo ──
     print("\n[3/6] Running Noise & Typo Tests (10+ variations)...")
     noise_test_defs = build_noise_tests()
     noise_results = []
     for test_def in noise_test_defs:
-        n_res = evaluator.run_noise_test(
-            base_query=test_def["base_query"],
-            noisy_queries=test_def["noisy_queries"],
-        )
-        noise_results.append(n_res)
-        success_count = sum(1 for r in n_res["noisy_results"] if r["is_successful"])
-        print(f"  [OK] '{test_def['base_query'][:50]}' - {success_count}/{len(test_def['noisy_queries'])} passed")
+        try:
+            n_res = evaluator.run_noise_test(
+                base_query=test_def["base_query"],
+                noisy_queries=test_def["noisy_queries"],
+            )
+            noise_results.append(n_res)
+            success_count = sum(1 for r in n_res["noisy_results"] if r["is_successful"])
+            print(f"  [OK] '{test_def['base_query'][:50]}' - {success_count}/{len(test_def['noisy_queries'])} passed")
+        except Exception as e:
+            print(f"  [ERROR] Noise test failed for '{test_def['base_query'][:30]}': {e}")
 
     # ── 4. Tool-Use Accuracy ──
     print("\n[4/6] Running Tool-Use Classification Tests (18 queries)...")
-    tool_tests = build_tool_use_tests()
-    tu_res = evaluator.run_tool_use_test(tool_tests)
-    print(f"  [OK] Classification Accuracy: {tu_res['classification_accuracy'] * 100:.1f}%")
+    tu_res = None
+    try:
+        tool_tests = build_tool_use_tests()
+        tu_res = evaluator.run_tool_use_test(tool_tests)
+        print(f"  [OK] Classification Accuracy: {tu_res['classification_accuracy'] * 100:.1f}%")
+    except Exception as e:
+        print(f"  [ERROR] Tool-use tests failed: {e}")
 
     # -- 5. Ablation: Pipeline vs Direct LLM (Expanded n=40) --
-    print(f"\n[5/6] Running Expanded Ablation: Pipeline vs Direct LLM ({len(precision_tests)} queries)...")
-    ab_res = evaluator.run_ablation_pipeline_vs_direct(precision_tests)
-    print(f"  [OK] Pipeline Accuracy: {ab_res['pipeline']['accuracy'] * 100:.1f}%")
-    print(f"  [OK] Direct LLM Accuracy: {ab_res['direct_llm']['accuracy'] * 100:.1f}%")
+    ab_res = None
+    if p_res:
+        print(f"\n[5/6] Running Expanded Ablation: Pipeline vs Direct LLM ({len(precision_tests)} queries)...")
+        try:
+            ab_res = evaluator.run_ablation_pipeline_vs_direct(precision_tests)
+            print(f"  [OK] Pipeline Accuracy: {ab_res['pipeline']['accuracy'] * 100:.1f}%")
+            print(f"  [OK] Direct LLM Accuracy: {ab_res['direct_llm']['accuracy'] * 100:.1f}%")
+        except Exception as e:
+            print(f"  [ERROR] Ablation tests failed: {e}")
 
     # -- 6. Ablation: Forecasting Models --
     print("\n[6/6] Running Ablation: Forecasting Models...")
     fc_res = None
     try:
         fc_res = evaluator.run_ablation_forecast_models(item=1, store=1, periods=10)
-        if "error" not in fc_res:
+        if fc_res and "error" not in fc_res:
             for model_name, data in fc_res["models"].items():
                 print(f"  [OK] {model_name}: {data['status']} ({data['latency']}s)")
         else:
-            print(f"  [WARN] Skipped: {fc_res.get('error', 'unknown error')}")
+            print(f"  [WARN] Skipped: {fc_res.get('error', 'unknown error') if fc_res else 'no data'}")
     except Exception as e:
-        print(f"  [WARN] Forecasting ablation skipped (missing dependency): {e}")
-        fc_res = None
+        print(f"  [WARN] Forecasting ablation skipped: {e}")
 
     # ── Generate Report ──
     print("\nGenerating report...")
-    report_md = generate_benchmarking_report(
-        consistency_results=consistency_results,
-        noise_results=noise_results,
-        precision_results=p_res,
-        tool_use_results=tu_res,
-        ablation_results=ab_res,
-        forecast_ablation=fc_res,
-    )
+    try:
+        report_md = generate_benchmarking_report(
+            consistency_results=consistency_results,
+            noise_results=noise_results,
+            precision_results=p_res,
+            tool_use_results=tu_res,
+            ablation_results=ab_res,
+            forecast_ablation=fc_res,
+        )
 
-    report_path = os.path.join(os.path.dirname(__file__), "..", "docs", "robustness_report.md")
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(report_md)
+        report_path = os.path.join(os.path.dirname(__file__), "..", "docs", "robustness_report.md")
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(report_md)
 
-    print(f"\n[DONE] Benchmarking Complete! Tested on {len(df)} rows.")
+        print(f"\n[DONE] Benchmarking Complete! tested on {len(df)} rows.")
+    except Exception as e:
+        print(f"  [ERROR] Report generation failed: {e}")
     print(f"   Precision queries:     {p_res['total_tests']}")
     print(f"   Tool-use queries:      {tu_res['total_tests']}")
     print(f"   Noise variations:      {sum(len(t['noisy_queries']) for t in noise_test_defs)}")

@@ -169,8 +169,9 @@ class RobustnessEvaluator:
             response_text = res.get("response", "")
             
             # Robust matching: strip commas and whitespace for numerical comparison
-            clean_response = str(response_text).lower().replace(",", "").strip()
-            clean_expected = str(expected).lower().replace(",", "").strip()
+            # Robust matching: strip commas, whitespace, and convert to float strings for comparison
+            clean_response = str(response_text).lower().replace(",", "").replace("$", "").strip()
+            clean_expected = str(expected).lower().replace(",", "").replace("$", "").strip()
             
             is_match = clean_expected in clean_response
             if is_match:

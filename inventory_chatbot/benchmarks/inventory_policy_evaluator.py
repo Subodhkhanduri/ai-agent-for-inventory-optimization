@@ -70,8 +70,6 @@ class InventoryPolicyEvaluator:
         test_df: pd.DataFrame,
         lead_time: int = DEFAULT_LEAD_TIME,
         service_level_z: float = DEFAULT_SERVICE_LEVEL_Z,
-        ordering_cost_S: float = DEFAULT_ORDERING_COST_S,
-        holding_cost_H: float = DEFAULT_HOLDING_COST_H,
     ):
         self.train_df = train_df.copy()
         self.test_df = test_df.copy()
@@ -197,19 +195,17 @@ class InventoryPolicyEvaluator:
             # 3. Record inventory level (end of day)
             inventory_levels.append(stock)
 
-            # 4. Periodic Review: Every P days, place order if position < ROP (or just every P days)
-            # The user specified: "reviewing every week to calculate this and ording the ammount"
+            # 4. Periodic Review: Every P days, place order to reach Target Level (T)
             if day_idx % self.P == 0:
                 # Inventory Position = stock + items on order
                 on_order = sum(qty for _, qty in pending_orders)
                 inventory_position = stock + on_order
                 
                 # Order up to Target Level (T)
-                if inventory_position < rop:
-                    order_qty = max(0, params["target_level"] - inventory_position)
-                    if order_qty > 0:
-                        pending_orders.append((day_idx + self.L, order_qty))
-                        n_orders_placed += 1
+                order_qty = max(0, params["target_level"] - inventory_position)
+                if order_qty > 0:
+                    pending_orders.append((day_idx + self.L, order_qty))
+                    n_orders_placed += 1
 
         total_days = len(test_subset)
 
