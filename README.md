@@ -232,11 +232,6 @@ $$Q = T - I_P$$
 
 Where P = review period, T = target inventory level, I_P = inventory position, Q = order quantity.
 
-### Economic Order Quantity (EOQ)
-
-$$EOQ = \sqrt{\frac{2 \times D \times S}{H}}$$
-
-Where D = annual demand, S = ordering cost per order, H = holding cost per unit per year.
 
 ---
 

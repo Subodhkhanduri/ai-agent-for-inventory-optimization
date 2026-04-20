@@ -1,7 +1,7 @@
 # run_inventory_evaluation.py
 
 """
-Standalone script to evaluate ROP, Order Quantity, and EOQ inventory policies.
+Standalone script to evaluate ROP and Periodic Review inventory policies.
 
 Usage:
     python run_inventory_evaluation.py                          # uses pre-split CSVs
@@ -60,8 +60,6 @@ def main():
         test_df=test_df,
         lead_time=7,
         service_level_z=1.65,
-        ordering_cost_S=50,
-        holding_cost_H=2,
     )
 
     print(f"Found {len(evaluator.pairs)} item-store pairs in both train & test sets.")
@@ -84,7 +82,6 @@ def main():
     agg = results["aggregate"]
     sim = agg["simulated_policy"]
     act = agg["actual_baseline"]
-    cost = agg["eoq_cost"]
 
     print(f"\n{'='*60}")
     print(f"  INVENTORY POLICY EVALUATION RESULTS")
@@ -92,12 +89,12 @@ def main():
     print(f"{'='*60}")
 
     print(f"\n  [SECTION] FILL RATE")
-    print(f"     ROP/EOQ Policy (weighted):  {sim['weighted_fill_rate']*100:.2f}%")
-    print(f"     Actual Baseline (mean):     {act['mean_fill_rate']*100:.2f}%")
+    print(f"     ROP/Periodic Policy (weighted):  {sim['weighted_fill_rate']*100:.2f}%")
+    print(f"     Actual Baseline (mean):          {act['mean_fill_rate']*100:.2f}%")
 
     print(f"\n  [SECTION] STOCKOUT DAYS")
-    print(f"     ROP/EOQ Policy (mean):      {sim['mean_stockout_days_pct']:.2f}%")
-    print(f"     Actual Baseline (mean):     {act['mean_stockout_days_pct']:.2f}%")
+    print(f"     ROP/Periodic Policy (mean):      {sim['mean_stockout_days_pct']:.2f}%")
+    print(f"     Actual Baseline (mean):          {act['mean_stockout_days_pct']:.2f}%")
 
     print(f"\n  [SECTION] FORECAST ACCURACY (Demand Mean Prediction)")
     print(f"     Mean Absolute Error (MAE):  {agg['forecast_accuracy']['mean_mae']:.4f}")
@@ -105,13 +102,9 @@ def main():
     print(f"     Mean Abs % Error (MAPE):    {agg['forecast_accuracy']['mean_mape']:.2f}%")
 
     print(f"\n  [SECTION] AVERAGE INVENTORY LEVEL")
-    print(f"     ROP/EOQ Policy (mean):      {sim['mean_avg_inventory']:.2f}")
-    print(f"     Actual Baseline (mean):     {act['mean_avg_inventory']:.2f}")
+    print(f"     ROP/Periodic Policy (mean):      {sim['mean_avg_inventory']:.2f}")
+    print(f"     Actual Baseline (mean):          {act['mean_avg_inventory']:.2f}")
 
-    print(f"\n  [SECTION] EOQ COST ANALYSIS")
-    print(f"     Mean TC (EOQ Policy):       ${cost['mean_tc_eoq']:,.2f}")
-    print(f"     Mean TC (Actual):           ${cost['mean_tc_actual']:,.2f}")
-    print(f"     Mean Cost Reduction:        {cost['mean_cost_reduction_pct']:.2f}%")
 
     print(f"\n{'='*60}")
 

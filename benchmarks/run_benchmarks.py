@@ -186,8 +186,6 @@ def build_precision_tests(df):
          "expected": "reorder", "category": "textual_knowledge"},
         {"query": "Explain safety stock",
          "expected": "safety", "category": "textual_knowledge"},
-        {"query": "What is EOQ?",
-         "expected": "order", "category": "textual_knowledge"},
         {"query": "What is lead time in inventory management?",
          "expected": "lead", "category": "textual_knowledge"},
         {"query": "What is the periodic review system?",

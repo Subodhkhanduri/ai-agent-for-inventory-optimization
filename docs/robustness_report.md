@@ -96,7 +96,6 @@ Queries where the expected output is a **keyword or concept** (intent classifica
 | Check if item 5 at store 3 needs restocking | ORDER | ✅ | 22.595 |
 | What is a reorder point? | reorder | ✅ | 2.418 |
 | Explain safety stock | safety | ❌ | 5.407 |
-| What is EOQ? | order | ✅ | 3.016 |
 | What is lead time in inventory management? | lead | ✅ | 8.372 |
 | What is the periodic review system? | review | ✅ | 8.271 |
 
@@ -224,7 +223,6 @@ Input queries were intentionally corrupted with misspellings, capitalization cha
 | How many columns are there? | ❌ | ✅ | 55.543 | 0.215 |
 | What is a reorder point? | ❌ | ❌ | 34.689 | 0.229 |
 | Explain safety stock | ❌ | ❌ | 0.323 | 0.136 |
-| What is EOQ? | ❌ | ❌ | 0.24 | 0.072 |
 | What is lead time in inventory management? | ❌ | ❌ | 0.31 | 0.083 |
 | What is the periodic review system? | ❌ | ❌ | 0.229 | 0.07 |
 

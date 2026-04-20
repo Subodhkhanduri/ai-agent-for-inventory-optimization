@@ -3,10 +3,12 @@
 """
 Inventory Policy Evaluation Module
 ===================================
-Validates ROP (Reorder Point), Order Quantity (Q), and EOQ policies by:
+Inventory Policy Evaluation Module
+===================================
+Validates ROP (Reorder Point) and Periodic Review (P, T) policies by:
   1. Learning parameters (μ, σ) from training data (2013-2016)
   2. Simulating inventory day-by-day through the test period (2017)
-  3. Computing Fill Rate, Stockout Days %, Average Inventory, and EOQ Total Cost
+  3. Computing Fill Rate, Stockout Days %, and Average Inventory
 
 The test dataset already contains actual inventory state columns (Start_Stock,
 End_Stock, Lost_Sales, etc.), which serve as a baseline for comparison.
@@ -50,13 +52,12 @@ def _confidence_interval(
 # ──────────────────────────────────────────────
 DEFAULT_LEAD_TIME = 7          # L (days)
 DEFAULT_SERVICE_LEVEL_Z = 1.65 # Z for ~95% service level
-DEFAULT_ORDERING_COST_S = 50   # $ per order
-DEFAULT_HOLDING_COST_H = 2     # $ per unit per year
+DEFAULT_REVIEW_PERIOD = 7      # P (days)
 
 
 class InventoryPolicyEvaluator:
     """
-    Evaluates ROP, Q, and EOQ inventory policies against test data.
+    Evaluates ROP and Periodic Review inventory policies against test data.
 
     Usage:
         evaluator = InventoryPolicyEvaluator(train_df, test_df)
@@ -76,8 +77,7 @@ class InventoryPolicyEvaluator:
         self.test_df = test_df.copy()
         self.L = lead_time
         self.Z = service_level_z
-        self.S = ordering_cost_S
-        self.H = holding_cost_H
+        self.P = DEFAULT_REVIEW_PERIOD
 
         # Ensure Date is datetime
         for df in [self.train_df, self.test_df]:
@@ -110,7 +110,7 @@ class InventoryPolicyEvaluator:
 
         Returns:
             Dict with mu (mean daily demand), sigma (std dev),
-            annual_demand, ROP, and EOQ.
+            annual_demand, ROP, and Target Level (T).
         """
         subset = self.train_df[
             (self.train_df["Item"] == item) & (self.train_df["Store"] == store)
@@ -128,8 +128,9 @@ class InventoryPolicyEvaluator:
         # Reorder Point: ROP = μ·L + Z·σ·√L
         rop = (mu * self.L) + (self.Z * sigma * math.sqrt(self.L))
 
-        # EOQ = √(2·D·S / H)
-        eoq = math.sqrt((2 * annual_demand * self.S) / self.H)
+        # Target Level (T) = μ·(P+L) + Z·σ·√(P+L)
+        protection_interval = self.P + self.L
+        target_level = (mu * protection_interval) + (self.Z * sigma * math.sqrt(protection_interval))
 
         return {
             "mu": mu,
@@ -137,7 +138,7 @@ class InventoryPolicyEvaluator:
             "n_train_days": n_days,
             "annual_demand": annual_demand,
             "rop": rop,
-            "eoq": eoq,
+            "target_level": target_level,
         }
 
     # ──────────────────────────────────────────
@@ -148,7 +149,7 @@ class InventoryPolicyEvaluator:
     ) -> Dict[str, Any]:
         """
         Day-by-day inventory simulation on the test set using the
-        trained ROP and EOQ parameters.
+        trained ROP and periodic review parameters.
 
         Returns:
             Dict with daily records + aggregated metrics.
@@ -158,7 +159,6 @@ class InventoryPolicyEvaluator:
         ].sort_values("Date").reset_index(drop=True)
 
         rop = params["rop"]
-        eoq = params["eoq"]
         mu = params["mu"]
 
         # Initialize stock at the ROP level (conservative start)
@@ -197,13 +197,19 @@ class InventoryPolicyEvaluator:
             # 3. Record inventory level (end of day)
             inventory_levels.append(stock)
 
-            # 4. Check reorder: if stock <= ROP, place order of EOQ
-            if stock <= rop:
-                # Only if we don't already have an order arriving
-                has_pending = any(True for _ in pending_orders)
-                if not has_pending:
-                    pending_orders.append((day_idx + self.L, eoq))
-                    n_orders_placed += 1
+            # 4. Periodic Review: Every P days, place order if position < ROP (or just every P days)
+            # The user specified: "reviewing every week to calculate this and ording the ammount"
+            if day_idx % self.P == 0:
+                # Inventory Position = stock + items on order
+                on_order = sum(qty for _, qty in pending_orders)
+                inventory_position = stock + on_order
+                
+                # Order up to Target Level (T)
+                if inventory_position < rop:
+                    order_qty = max(0, params["target_level"] - inventory_position)
+                    if order_qty > 0:
+                        pending_orders.append((day_idx + self.L, order_qty))
+                        n_orders_placed += 1
 
         total_days = len(test_subset)
 
@@ -301,50 +307,6 @@ class InventoryPolicyEvaluator:
             "avg_actual_order_size": round(float(avg_actual_order_size), 2),
         }
 
-    # ──────────────────────────────────────────
-    # EOQ Total Cost Calculation
-    # ──────────────────────────────────────────
-    def _compute_eoq_cost(
-        self, params: Dict[str, float], actual_metrics: Dict[str, Any]
-    ) -> Dict[str, float]:
-        """
-        TC_EOQ   = (D/Q)·S + (Q/2)·H
-        TC_actual = (D/Q_actual)·S + (Q_actual/2)·H
-
-        where Q_actual = average actual order quantity from the dataset.
-        """
-        D = params["annual_demand"]
-        Q_eoq = params["eoq"]
-        S = self.S
-        H = self.H
-
-        # EOQ total cost
-        tc_eoq = (D / Q_eoq) * S + (Q_eoq / 2) * H
-
-        # Actual total cost estimate
-        avg_actual_q = actual_metrics.get("avg_actual_order_size", 0)
-        n_actual_orders = actual_metrics.get("n_actual_orders", 0)
-
-        if avg_actual_q > 0:
-            tc_actual = (D / avg_actual_q) * S + (avg_actual_q / 2) * H
-        else:
-            # If no ordering data, estimate using monthly ordering
-            monthly_q = D / 12
-            tc_actual = 12 * S + (monthly_q / 2) * H if monthly_q > 0 else 0
-
-        cost_reduction_pct = (
-            ((tc_actual - tc_eoq) / tc_actual * 100) if tc_actual > 0 else 0
-        )
-
-        return {
-            "annual_demand_D": round(D, 2),
-            "eoq_Q": round(Q_eoq, 2),
-            "ordering_cost_S": S,
-            "holding_cost_H": H,
-            "tc_eoq": round(tc_eoq, 2),
-            "tc_actual": round(tc_actual, 2),
-            "cost_reduction_pct": round(cost_reduction_pct, 2),
-        }
 
     # ──────────────────────────────────────────
     # Evaluate a single item-store pair
@@ -356,7 +318,6 @@ class InventoryPolicyEvaluator:
         params = self._train_parameters(item, store)
         sim = self._simulate_inventory(item, store, params)
         actual = self._compute_actual_metrics(item, store)
-        cost = self._compute_eoq_cost(params, actual)
 
         return {
             "item": item,
@@ -365,7 +326,7 @@ class InventoryPolicyEvaluator:
                 "mu": round(params["mu"], 2),
                 "sigma": round(params["sigma"], 2),
                 "rop": round(params["rop"], 2),
-                "eoq": round(params["eoq"], 2),
+                "target_level": round(params["target_level"], 2),
                 "annual_demand": round(params["annual_demand"], 2),
             },
             "simulated_policy": {
@@ -386,7 +347,6 @@ class InventoryPolicyEvaluator:
                 "total_demand": actual["total_demand"],
                 "total_lost_sales": actual["total_lost_sales"],
             },
-            "eoq_cost_analysis": cost,
         }
 
     # ──────────────────────────────────────────
@@ -430,8 +390,7 @@ class InventoryPolicyEvaluator:
             "config": {
                 "lead_time_L": self.L,
                 "service_level_Z": self.Z,
-                "ordering_cost_S": self.S,
-                "holding_cost_H": self.H,
+                "review_period_P": self.P,
                 "n_pairs_evaluated": len(pair_results),
                 "n_pairs_total": len(self.pairs),
                 "train_rows": len(self.train_df),
@@ -455,9 +414,6 @@ class InventoryPolicyEvaluator:
         act_stockout_pcts = [r["actual_baseline"]["stockout_days_pct"] for r in pair_results]
         act_avg_invs = [r["actual_baseline"]["avg_inventory"] for r in pair_results]
 
-        cost_reductions = [r["eoq_cost_analysis"]["cost_reduction_pct"] for r in pair_results]
-        tc_eoqs = [r["eoq_cost_analysis"]["tc_eoq"] for r in pair_results]
-        tc_actuals = [r["eoq_cost_analysis"]["tc_actual"] for r in pair_results]
 
         # Forecast errors
         maes = [r["forecast_metrics"]["mae"] for r in pair_results]
@@ -473,7 +429,6 @@ class InventoryPolicyEvaluator:
         ci_fill_rate = _confidence_interval(sim_fill_rates)
         ci_stockout = _confidence_interval(sim_stockout_pcts)
         ci_avg_inv = _confidence_interval(sim_avg_invs)
-        ci_cost_red = _confidence_interval(cost_reductions)
 
         return {
             "simulated_policy": {
@@ -497,19 +452,10 @@ class InventoryPolicyEvaluator:
                 "mean_stockout_days_pct": round(float(np.mean(act_stockout_pcts)), 2),
                 "mean_avg_inventory": round(float(np.mean(act_avg_invs)), 2),
             },
-            "eoq_cost": {
-                "mean_tc_eoq": round(float(np.mean(tc_eoqs)), 2),
-                "mean_tc_actual": round(float(np.mean(tc_actuals)), 2),
-                "mean_cost_reduction_pct": round(float(np.mean(cost_reductions)), 2),
-                "median_cost_reduction_pct": round(float(np.median(cost_reductions)), 2),
-                "total_tc_eoq": round(float(np.sum(tc_eoqs)), 2),
-                "total_tc_actual": round(float(np.sum(tc_actuals)), 2),
-            },
             "statistical_stability": {
                 "fill_rate": ci_fill_rate,
                 "stockout_days_pct": ci_stockout,
                 "avg_inventory": ci_avg_inv,
-                "cost_reduction_pct": ci_cost_red,
             },
         }
 
@@ -526,7 +472,6 @@ def generate_inventory_policy_report(results: Dict[str, Any]) -> str:
     agg = results["aggregate"]
     sim = agg["simulated_policy"]
     act = agg["actual_baseline"]
-    cost = agg["eoq_cost"]
 
     lines = [
         "# Inventory Policy Evaluation Report",
@@ -540,8 +485,7 @@ def generate_inventory_policy_report(results: Dict[str, Any]) -> str:
         f"| Item-Store Pairs Evaluated | {config['n_pairs_evaluated']} |",
         f"| Lead Time (L) | {config['lead_time_L']} days |",
         f"| Service Level (Z) | {config['service_level_Z']} (~{_z_to_pct(config['service_level_Z'])}%) |",
-        f"| Ordering Cost (S) | ${config['ordering_cost_S']} |",
-        f"| Holding Cost (H) | ${config['holding_cost_H']}/unit/year |",
+        f"| Review Period (P) | {config.get('review_period_P', 7)} days |",
         "",
         "---",
         "",
@@ -551,7 +495,7 @@ def generate_inventory_policy_report(results: Dict[str, Any]) -> str:
         "",
         "$$\\text{Fill Rate} = 1 - \\frac{\\sum \\text{Unmet Demand}}{\\sum \\text{Total Demand}}$$",
         "",
-        "| Metric | ROP/EOQ Policy | Actual Baseline |",
+        "| Metric | ROP/Periodic Policy | Actual Baseline |",
         "|---|---|---|",
         f"| **Weighted Fill Rate** | **{sim['weighted_fill_rate']*100:.2f}%** | {act['mean_fill_rate']*100:.2f}% |",
         f"| Mean Fill Rate (per pair) | {sim['mean_fill_rate']*100:.2f}% | {act['mean_fill_rate']*100:.2f}% |",
@@ -567,7 +511,7 @@ def generate_inventory_policy_report(results: Dict[str, Any]) -> str:
         "$$\\text{Stockout Days \\%} = \\frac{\\text{Days with demand > inventory}}"
         "{\\text{Total days}} \\times 100$$",
         "",
-        "| Metric | ROP/EOQ Policy | Actual Baseline |",
+        "| Metric | ROP/Periodic Policy | Actual Baseline |",
         "|---|---|---|",
         f"| **Mean Stockout Days %** | **{sim['mean_stockout_days_pct']:.2f}%** | {act['mean_stockout_days_pct']:.2f}% |",
         f"| Median Stockout Days % | {sim['median_stockout_days_pct']:.2f}% | — |",
@@ -576,22 +520,10 @@ def generate_inventory_policy_report(results: Dict[str, Any]) -> str:
         "",
         "$$\\text{Average Inventory} = \\frac{1}{T} \\sum_{t=1}^{T} I_t$$",
         "",
-        "| Metric | ROP/EOQ Policy | Actual Baseline |",
+        "| Metric | ROP/Periodic Policy | Actual Baseline |",
         "|---|---|---|",
         f"| **Mean Avg Inventory** | **{sim['mean_avg_inventory']:.2f}** | {act['mean_avg_inventory']:.2f} |",
         "",
-        "### 4. Total Cost (EOQ Analysis)",
-        "",
-        "$$TC = \\frac{D}{Q} \\cdot S + \\frac{Q}{2} \\cdot H$$",
-        "",
-        "| Metric | Value |",
-        "|---|---|",
-        f"| Mean TC (EOQ Policy) | ${cost['mean_tc_eoq']:,.2f} |",
-        f"| Mean TC (Actual Ordering) | ${cost['mean_tc_actual']:,.2f} |",
-        f"| **Mean Cost Reduction** | **{cost['mean_cost_reduction_pct']:.2f}%** |",
-        f"| Median Cost Reduction | {cost['median_cost_reduction_pct']:.2f}% |",
-        f"| Total TC (EOQ, all pairs) | ${cost['total_tc_eoq']:,.2f} |",
-        f"| Total TC (Actual, all pairs) | ${cost['total_tc_actual']:,.2f} |",
         "",
         "---",
         "",
@@ -600,7 +532,7 @@ def generate_inventory_policy_report(results: Dict[str, Any]) -> str:
     ]
 
     # Add interpretation bullets
-    interp = _build_interpretation(sim, act, cost)
+    interp = _build_interpretation(sim, act)
     lines.extend(interp)
 
     # Statistical stability section
@@ -631,12 +563,12 @@ def _fill_rate_verdict(fr: float) -> str:
         return "> ❌ **Low**: Fill rate < 80% — policy may need tuning."
 
 
-def _build_interpretation(sim, act, cost) -> List[str]:
+def _build_interpretation(sim, act) -> List[str]:
     lines = []
 
     # Fill rate comparison
     if sim["weighted_fill_rate"] >= 0.95:
-        lines.append("- **Fill Rate**: The ROP/EOQ policy achieves ≥95% fill rate, "
+        lines.append("- **Fill Rate**: The ROP/Periodic policy achieves ≥95% fill rate, "
                       "confirming the Z=1.65 service level is effective.")
     elif sim["weighted_fill_rate"] >= 0.90:
         lines.append("- **Fill Rate**: The policy achieves 90-95% fill rate. "
@@ -662,15 +594,6 @@ def _build_interpretation(sim, act, cost) -> List[str]:
         lines.append(f"- **Avg Inventory**: Policy carries higher average inventory "
                       f"({sim['mean_avg_inventory']:.1f} vs. {act['mean_avg_inventory']:.1f} actual). "
                       "This is the trade-off for improved service level.")
-
-    # Cost
-    if cost["mean_cost_reduction_pct"] > 0:
-        lines.append(f"- **EOQ Cost**: The EOQ policy achieves a "
-                      f"**{cost['mean_cost_reduction_pct']:.1f}% cost reduction** "
-                      f"over current ordering patterns.")
-    else:
-        lines.append(f"- **EOQ Cost**: Current ordering patterns are already close to optimal "
-                      f"(cost difference: {cost['mean_cost_reduction_pct']:.1f}%).")
 
     lines.append("")
     return lines
@@ -749,7 +672,7 @@ def _per_pair_summary(pair_results: List[Dict], top_n: int = 5) -> List[str]:
         "",
         "### Top Performers (Highest Fill Rate)",
         "",
-        "| Item | Store | Fill Rate | Stockout % | Avg Inventory | EOQ | ROP |",
+        "| Item | Store | Fill Rate | Stockout % | Avg Inventory | Target (T) | ROP |",
         "|---|---|---|---|---|---|---|",
     ]
 
@@ -761,7 +684,7 @@ def _per_pair_summary(pair_results: List[Dict], top_n: int = 5) -> List[str]:
             f"{sp['fill_rate']*100:.1f}% | "
             f"{sp['stockout_days_pct']:.1f}% | "
             f"{sp['avg_inventory']:.1f} | "
-            f"{tp['eoq']:.0f} | "
+            f"{tp['target_level']:.0f} | "
             f"{tp['rop']:.0f} |"
         )
 
@@ -769,7 +692,7 @@ def _per_pair_summary(pair_results: List[Dict], top_n: int = 5) -> List[str]:
         "",
         "### Pairs Needing Attention (Lowest Fill Rate)",
         "",
-        "| Item | Store | Fill Rate | Stockout % | Avg Inventory | EOQ | ROP |",
+        "| Item | Store | Fill Rate | Stockout % | Avg Inventory | Target (T) | ROP |",
         "|---|---|---|---|---|---|---|",
     ])
 
@@ -781,7 +704,7 @@ def _per_pair_summary(pair_results: List[Dict], top_n: int = 5) -> List[str]:
             f"{sp['fill_rate']*100:.1f}% | "
             f"{sp['stockout_days_pct']:.1f}% | "
             f"{sp['avg_inventory']:.1f} | "
-            f"{tp['eoq']:.0f} | "
+            f"{tp['target_level']:.0f} | "
             f"{tp['rop']:.0f} |"
         )
 

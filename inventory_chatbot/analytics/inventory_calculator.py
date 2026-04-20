@@ -645,5 +645,5 @@ def calculate_batch_periodic_review(df: pd.DataFrame, review_period_days: int = 
 
     return results_df
 
-def calculate_eoq(annual_demand: float, ordering_cost: float, holding_cost_per_unit: float) -> float: return math.sqrt((2 * annual_demand * ordering_cost) / holding_cost_per_unit)
+
 

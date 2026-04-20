@@ -177,7 +177,7 @@ Categories:
 Rules:
 - If asking for DATA from the inventory → SQL
 - If asking "how many", "show me", "which stores", "total sales", "sum", "records exist" → SQL
-- If asking for ADVICE or EXPLANATION (e.g. "what is EOQ", "how does safety stock work") → LLM
+- If asking for ADVICE or EXPLANATION (e.g. "how does safety stock work") → LLM
 - If asking "what should I do" → LLM
 
 Respond with ONLY: SQL or LLM"""
