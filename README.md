@@ -46,7 +46,7 @@
 | 🔐 **Role-Based Access Control** | JWT-authenticated users with viewer/manager/admin roles controlling feature access |
 | 🧠 **Multi-Agent Orchestration** | Intelligent query routing: SQL path for data queries, LLM path for knowledge questions |
 | 🛡️ **100% Noise Tolerance** | Typo-resilient NLP — handles misspellings, ALL CAPS, slang, and shorthand queries |
-| ⚡ **Sub-15s Response Time** | P99 latency under 15.0s via Groq LPU inference — no GPU required locally |
+| ⚡ **Sub-15.0s Response Time** | P99 latency under 15.0s via Groq LPU inference — no GPU required locally |
 
 ---
 
@@ -213,7 +213,7 @@ Comprehensive evaluation across **40+ queries** with automated benchmarking:
 
 > The full pipeline achieves **+28% higher accuracy** than sending raw queries directly to the LLM — demonstrating that the Text-to-SQL + tool orchestration approach is significantly more reliable.
 
-📄 *Full report: [docs/robustness_report.md](docs/robustness_report.md)*
+    📄 *Full report: [docs/robustness_report.md](docs/robustness_report.md)*
 
 ---
 
