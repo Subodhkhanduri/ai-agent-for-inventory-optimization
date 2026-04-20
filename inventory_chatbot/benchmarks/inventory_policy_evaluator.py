@@ -212,6 +212,18 @@ class InventoryPolicyEvaluator:
         stockout_pct = (stockout_days / total_days * 100) if total_days > 0 else 0.0
         avg_inventory = float(np.mean(inventory_levels)) if inventory_levels else 0.0
 
+        # Forecast accuracy metrics (comparing mu used for ROP vs actual Test demand)
+        test_demand = test_subset["Demand"].values
+        # Predicted is essentially 'mu' for each day in this simple model
+        predicted_demand = np.full_like(test_demand, mu)
+        
+        # Avoid division by zero for MAPE
+        safe_actual = np.where(test_demand == 0, 1e-10, test_demand)
+        
+        mae = float(np.mean(np.abs(test_demand - predicted_demand)))
+        rmse = float(np.sqrt(np.mean((test_demand - predicted_demand) ** 2)))
+        mape = float(np.mean(np.abs((test_demand - predicted_demand) / safe_actual)) * 100)
+
         return {
             "total_days": total_days,
             "total_demand": round(total_demand, 2),
@@ -221,6 +233,11 @@ class InventoryPolicyEvaluator:
             "stockout_days_pct": round(stockout_pct, 2),
             "avg_inventory_level": round(avg_inventory, 2),
             "n_orders_placed": n_orders_placed,
+            "forecast_metrics": {
+                "mae": round(mae, 4),
+                "rmse": round(rmse, 4),
+                "mape": round(mape, 2)
+            },
             "inventory_levels": inventory_levels,
         }
 
@@ -360,6 +377,7 @@ class InventoryPolicyEvaluator:
                 "total_unmet": sim["total_unmet_demand"],
                 "n_orders": sim["n_orders_placed"],
             },
+            "forecast_metrics": sim["forecast_metrics"],
             "actual_baseline": {
                 "fill_rate": actual["actual_fill_rate"],
                 "stockout_days": actual["actual_stockout_days"],
@@ -441,6 +459,11 @@ class InventoryPolicyEvaluator:
         tc_eoqs = [r["eoq_cost_analysis"]["tc_eoq"] for r in pair_results]
         tc_actuals = [r["eoq_cost_analysis"]["tc_actual"] for r in pair_results]
 
+        # Forecast errors
+        maes = [r["forecast_metrics"]["mae"] for r in pair_results]
+        rmses = [r["forecast_metrics"]["rmse"] for r in pair_results]
+        mapes = [r["forecast_metrics"]["mape"] for r in pair_results]
+
         # Weighted overall fill rate (by demand volume)
         total_demand_all = sum(sim_total_demands)
         total_unmet_all = sum(sim_total_unmets)
@@ -463,6 +486,11 @@ class InventoryPolicyEvaluator:
                 "mean_avg_inventory": round(float(np.mean(sim_avg_invs)), 2),
                 "total_demand": round(total_demand_all, 2),
                 "total_unmet_demand": round(total_unmet_all, 2),
+            },
+            "forecast_accuracy": {
+                "mean_mae": round(float(np.mean(maes)), 4),
+                "mean_rmse": round(float(np.mean(rmses)), 4),
+                "mean_mape": round(float(np.mean(mapes)), 2)
             },
             "actual_baseline": {
                 "mean_fill_rate": round(float(np.mean(act_fill_rates)), 4),

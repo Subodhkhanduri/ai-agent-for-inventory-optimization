@@ -110,26 +110,32 @@ RULES:
    - If asked for "sales" or "total sales", always aggregate the `Daily_Sales` column (e.g., SUM(Daily_Sales)). DO NOT sum Quantity.
    - If asked for "demand", aggregate the `Demand` column.
    - If asked for "quantity", aggregate the `Quantity` column.
+   - ALWAYS use explicit ALIASES for aggregated columns (e.g., `SELECT SUM(Daily_Sales) AS total_sales`).
 6. FILTERING INFERENCE:
    - If a query mentions specific IDs like "item 1", "store 2", ensure you include `WHERE Item = 1 AND Store = 2`.
+   - IMPORTANT: If a query asks for "across all stores" or "for all items", DO NOT include filters for specific stores or items even if they were mentioned in previous conversation context.
 7. AGGREGATION ALIGNMENT:
    - For aggregations (SUM, AVG, MIN, MAX), ensure proper GROUP BY clauses for any non-aggregated selected columns.
 8. COUNTING:
-   - "How many stores" -> COUNT(DISTINCT Store)
-   - "How many items" -> COUNT(DISTINCT Item)
+   - "How many stores" -> SELECT COUNT(DISTINCT Store) AS store_count FROM inventory
+   - "How many items" -> SELECT COUNT(DISTINCT Item) AS item_count FROM inventory
+   - "How many rows" or "How many records" -> SELECT COUNT(*) AS record_count FROM inventory
 
 EXAMPLES:
 Query: "What is the total sum of daily sales for item 1 in store 1?"
-SQL: SELECT SUM(Daily_Sales) FROM inventory WHERE Item = 1 AND Store = 1;
+SQL: SELECT SUM(Daily_Sales) AS total_sales FROM inventory WHERE Item = 1 AND Store = 1;
 
 Query: "What is the average demand across all items?"
-SQL: SELECT AVG(Demand) FROM inventory;
+SQL: SELECT AVG(Demand) AS avg_demand FROM inventory;
 
 Query: "How many different items does store 1 carry?"
-SQL: SELECT COUNT(DISTINCT Item) FROM inventory WHERE Store = 1;
+SQL: SELECT COUNT(DISTINCT Item) AS item_count FROM inventory WHERE Store = 1;
 
 Query: "What are the total sales for store 2?"
-SQL: SELECT SUM(Daily_Sales) FROM inventory WHERE Store = 2;
+SQL: SELECT SUM(Daily_Sales) AS total_sales FROM inventory WHERE Store = 2;
+
+Query: "Total sales for item 1 across all stores"
+SQL: SELECT SUM(Daily_Sales) AS total_sales FROM inventory WHERE Item = 1;
 
 USER QUERY: {natural_query}
 

@@ -93,6 +93,7 @@ class RobustnessEvaluator:
                 "cpu_before": cpu_before,
                 "cpu_after": cpu_after,
             })
+            time.sleep(1.0) # Rate limit protection
 
         latencies = [r["latency"] for r in results]
         unique_responses = len(set(r["response"] for r in results))
@@ -130,6 +131,7 @@ class RobustnessEvaluator:
                 "is_successful": "error" not in res.get("response", "").lower(),
                 "latency": elapsed,
             })
+            time.sleep(1.0) # Rate limit protection
 
         return {
             "base_query": base_query,
@@ -165,7 +167,12 @@ class RobustnessEvaluator:
             latencies.append(elapsed)
 
             response_text = res.get("response", "")
-            is_match = str(expected).lower() in str(response_text).lower()
+            
+            # Robust matching: strip commas and whitespace for numerical comparison
+            clean_response = str(response_text).lower().replace(",", "").strip()
+            clean_expected = str(expected).lower().replace(",", "").strip()
+            
+            is_match = clean_expected in clean_response
             if is_match:
                 successful_matches += 1
 
@@ -179,6 +186,7 @@ class RobustnessEvaluator:
                 "cpu_before": cpu_before,
                 "cpu_after": cpu_after,
             })
+            time.sleep(1.0) # Rate limit protection
 
         precision_score = successful_matches / len(queries) if queries else 0.0
 
@@ -256,6 +264,7 @@ class RobustnessEvaluator:
                 "classify_latency": classify_time,
                 "total_latency": total_time,
             })
+            time.sleep(1.0) # Rate limit protection
 
         accuracy = correct_classifications / len(test_cases) if test_cases else 0.0
 
@@ -344,6 +353,7 @@ Answer this question accurately and concisely:
                 "is_match": direct_match,
                 "latency": direct_time,
             })
+            time.sleep(1.0) # Rate limit protection
 
         # Aggregate
         pipe_latencies = [r["latency"] for r in pipeline_results]

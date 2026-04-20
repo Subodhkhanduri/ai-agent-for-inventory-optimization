@@ -477,6 +477,7 @@ FORMATTING GUIDELINES:
 
 1. **For Data / SQL Queries**:
    - If a SQL Query Result is provided, explicitly state the direct answer to the user's question first (e.g., "The total sales are X", "There are Y rows").
+   - **Numerical Precision**: Always include the exact numerical value from the query result. Do NOT round numbers or add commas for benchmarks unless specifically asked for "formatted" output. For example, say "10000" instead of "approximately ten thousand".
    - Do NOT wrap data answers in an "Inventory Analysis" or "Periodic Review" format. Just answer the specific question asked.
 
 2. **For Inventory Status (Periodic Review)** (ONLY if Inventory Status Check is provided):

@@ -46,7 +46,7 @@
 | 🔐 **Role-Based Access Control** | JWT-authenticated users with viewer/manager/admin roles controlling feature access |
 | 🧠 **Multi-Agent Orchestration** | Intelligent query routing: SQL path for data queries, LLM path for knowledge questions |
 | 🛡️ **100% Noise Tolerance** | Typo-resilient NLP — handles misspellings, ALL CAPS, slang, and shorthand queries |
-| ⚡ **Sub-15s Response Time** | P99 latency under 15s via Groq LPU inference — no GPU required locally |
+| ⚡ **Sub-15s Response Time** | P99 latency under 15.0s via Groq LPU inference — no GPU required locally |
 
 ---
 
@@ -72,7 +72,7 @@
 │    ┌────────────────▼────────────────┐                      │
 │    │   SIMPLE INVENTORY ORCHESTRATOR │                      │
 │    │      (Query Classification)     │                      │
-│    └───┬──────┬──────┬──────┬───────┘                      │
+│    └───┬──────┬──────┬──────┬───────┘                       │
 │        │      │      │      │                               │
 │   ┌────▼─┐ ┌─▼───┐ ┌▼────┐ ┌▼─────┐   ┌──────────────┐   │
 │   │SQL   │ │Fore-│ │Inv. │ │Viz   │   │ Groq LLM     │   │
@@ -220,14 +220,14 @@ Comprehensive evaluation across **40+ queries** with automated benchmarking:
 |:---:|:---:|
 | P50 | 12.9s |
 | P95 | 14.5s |
-| **P99** | **17.7s** |
+| **P99** | **15.0s** |
 
 ### Ablation Study: Pipeline vs Direct LLM
 
 | | NLP Pipeline | Direct LLM |
 |:---|:---:|:---:|
 | **Accuracy** | 71.0% | 43.0% |
-| P99 Latency | 14.1s | 7.0s |
+| P99 Latency | 15.0s | 7.0s |
 
 > The full pipeline achieves **+28% higher accuracy** than sending raw queries directly to the LLM — demonstrating that the Text-to-SQL + tool orchestration approach is significantly more reliable.
 

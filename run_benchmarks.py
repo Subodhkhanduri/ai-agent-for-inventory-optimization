@@ -14,6 +14,8 @@ Comprehensive LLM Robustness & Pipeline Stability Benchmarking Suite
 """
 
 import sys
+print("[BOOT] Script starting...", flush=True)
+import os
 import pandas as pd
 import numpy as np
 import logging
@@ -302,15 +304,15 @@ def main():
     for query, trials in consistency_queries:
         c_res = evaluator.run_consistency_test(query, trials=trials)
         consistency_results.append(c_res)
-        print(f"  ✓ '{query[:50]}' — Consistency: {c_res['consistency_score']*100:.0f}%, "
+        print(f"  [OK] '{query[:50]}' - Consistency: {c_res['consistency_score']*100:.0f}%, "
               f"P99: {c_res['latency_stats'].get('p99', 'N/A')}s")
 
-    # ── 2. Precision (40+ ground-truth queries) ──
+    # -- 2. Precision (40+ ground-truth queries) --
     print("\n[2/6] Running Precision Tests (40+ queries)...")
     precision_tests = build_precision_tests(df)
     p_res = evaluator.run_precision_test(precision_tests)
-    print(f"  ✓ Precision Score: {p_res['precision_score'] * 100:.1f}% ({p_res['total_tests']} tests)")
-    print(f"  ✓ Latency P99: {p_res['latency_stats'].get('p99', 'N/A')}s, "
+    print(f"  [OK] Precision Score: {p_res['precision_score'] * 100:.1f}% ({p_res['total_tests']} tests)")
+    print(f"  [OK] Latency P99: {p_res['latency_stats'].get('p99', 'N/A')}s, "
           f"Std: {p_res['latency_stats'].get('std', 'N/A')}s")
 
     # Category breakdown
@@ -325,7 +327,7 @@ def main():
 
     for cat, counts in sorted(categories.items()):
         acc = counts["correct"] / counts["total"] * 100
-        print(f"    • {cat}: {acc:.0f}% ({counts['correct']}/{counts['total']})")
+        print(f"    - {cat}: {acc:.0f}% ({counts['correct']}/{counts['total']})")
 
     # ── 3. Noise / Typo ──
     print("\n[3/6] Running Noise & Typo Tests (10+ variations)...")
@@ -338,33 +340,32 @@ def main():
         )
         noise_results.append(n_res)
         success_count = sum(1 for r in n_res["noisy_results"] if r["is_successful"])
-        print(f"  ✓ '{test_def['base_query'][:50]}' — {success_count}/{len(test_def['noisy_queries'])} passed")
+        print(f"  [OK] '{test_def['base_query'][:50]}' - {success_count}/{len(test_def['noisy_queries'])} passed")
 
     # ── 4. Tool-Use Accuracy ──
     print("\n[4/6] Running Tool-Use Classification Tests (18 queries)...")
     tool_tests = build_tool_use_tests()
     tu_res = evaluator.run_tool_use_test(tool_tests)
-    print(f"  ✓ Classification Accuracy: {tu_res['classification_accuracy'] * 100:.1f}%")
+    print(f"  [OK] Classification Accuracy: {tu_res['classification_accuracy'] * 100:.1f}%")
 
-    # ── 5. Ablation: Pipeline vs Direct LLM ──
-    print("\n[5/6] Running Ablation: Pipeline vs Direct LLM (7 queries)...")
-    ablation_queries = build_ablation_queries(df)
-    ab_res = evaluator.run_ablation_pipeline_vs_direct(ablation_queries)
-    print(f"  ✓ Pipeline Accuracy: {ab_res['pipeline']['accuracy'] * 100:.1f}%")
-    print(f"  ✓ Direct LLM Accuracy: {ab_res['direct_llm']['accuracy'] * 100:.1f}%")
+    # -- 5. Ablation: Pipeline vs Direct LLM (Expanded n=40) --
+    print(f"\n[5/6] Running Expanded Ablation: Pipeline vs Direct LLM ({len(precision_tests)} queries)...")
+    ab_res = evaluator.run_ablation_pipeline_vs_direct(precision_tests)
+    print(f"  [OK] Pipeline Accuracy: {ab_res['pipeline']['accuracy'] * 100:.1f}%")
+    print(f"  [OK] Direct LLM Accuracy: {ab_res['direct_llm']['accuracy'] * 100:.1f}%")
 
-    # ── 6. Ablation: Forecasting Models ──
+    # -- 6. Ablation: Forecasting Models --
     print("\n[6/6] Running Ablation: Forecasting Models...")
     fc_res = None
     try:
         fc_res = evaluator.run_ablation_forecast_models(item=1, store=1, periods=10)
         if "error" not in fc_res:
             for model_name, data in fc_res["models"].items():
-                print(f"  ✓ {model_name}: {data['status']} ({data['latency']}s)")
+                print(f"  [OK] {model_name}: {data['status']} ({data['latency']}s)")
         else:
-            print(f"  ⚠ Skipped: {fc_res.get('error', 'unknown error')}")
+            print(f"  [WARN] Skipped: {fc_res.get('error', 'unknown error')}")
     except Exception as e:
-        print(f"  ⚠ Forecasting ablation skipped (missing dependency): {e}")
+        print(f"  [WARN] Forecasting ablation skipped (missing dependency): {e}")
         fc_res = None
 
     # ── Generate Report ──
@@ -381,7 +382,7 @@ def main():
     with open("robustness_report.md", "w", encoding="utf-8") as f:
         f.write(report_md)
 
-    print(f"\n✅ Benchmarking Complete! Tested on {len(df)} rows.")
+    print(f"\n[DONE] Benchmarking Complete! Tested on {len(df)} rows.")
     print(f"   Precision queries:     {p_res['total_tests']}")
     print(f"   Tool-use queries:      {tu_res['total_tests']}")
     print(f"   Noise variations:      {sum(len(t['noisy_queries']) for t in noise_test_defs)}")

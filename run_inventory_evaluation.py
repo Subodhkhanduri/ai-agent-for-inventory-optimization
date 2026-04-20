@@ -42,11 +42,11 @@ def main():
     # ── Load Data ──
     print(f"Loading training data from: {train_path}")
     train_df = pd.read_csv(train_path)
-    print(f"  → {len(train_df):,} rows")
+    print(f"  -> {len(train_df):,} rows")
 
     print(f"Loading test data from: {test_path}")
     test_df = pd.read_csv(test_path)
-    print(f"  → {len(test_df):,} rows")
+    print(f"  -> {len(test_df):,} rows")
 
     # ── Initialize Evaluator ──
     print("\nInitializing evaluator...")
@@ -86,19 +86,24 @@ def main():
     print(f"  ({results['config']['n_pairs_evaluated']} pairs evaluated in {elapsed:.1f}s)")
     print(f"{'='*60}")
 
-    print(f"\n  📊 FILL RATE")
+    print(f"\n  [SECTION] FILL RATE")
     print(f"     ROP/EOQ Policy (weighted):  {sim['weighted_fill_rate']*100:.2f}%")
     print(f"     Actual Baseline (mean):     {act['mean_fill_rate']*100:.2f}%")
 
-    print(f"\n  📉 STOCKOUT DAYS")
+    print(f"\n  [SECTION] STOCKOUT DAYS")
     print(f"     ROP/EOQ Policy (mean):      {sim['mean_stockout_days_pct']:.2f}%")
     print(f"     Actual Baseline (mean):     {act['mean_stockout_days_pct']:.2f}%")
 
-    print(f"\n  📦 AVERAGE INVENTORY LEVEL")
+    print(f"\n  [SECTION] FORECAST ACCURACY (Demand Mean Prediction)")
+    print(f"     Mean Absolute Error (MAE):  {agg['forecast_accuracy']['mean_mae']:.4f}")
+    print(f"     Root Mean Square Error:     {agg['forecast_accuracy']['mean_rmse']:.4f}")
+    print(f"     Mean Abs % Error (MAPE):    {agg['forecast_accuracy']['mean_mape']:.2f}%")
+
+    print(f"\n  [SECTION] AVERAGE INVENTORY LEVEL")
     print(f"     ROP/EOQ Policy (mean):      {sim['mean_avg_inventory']:.2f}")
     print(f"     Actual Baseline (mean):     {act['mean_avg_inventory']:.2f}")
 
-    print(f"\n  💰 EOQ COST ANALYSIS")
+    print(f"\n  [SECTION] EOQ COST ANALYSIS")
     print(f"     Mean TC (EOQ Policy):       ${cost['mean_tc_eoq']:,.2f}")
     print(f"     Mean TC (Actual):           ${cost['mean_tc_actual']:,.2f}")
     print(f"     Mean Cost Reduction:        {cost['mean_cost_reduction_pct']:.2f}%")
@@ -110,7 +115,7 @@ def main():
     report_path = "inventory_policy_report.md"
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_md)
-    print(f"\n✅ Report saved to: {report_path}")
+    print(f"\n[OK] Report saved to: {report_path}")
 
 
 if __name__ == "__main__":
