@@ -126,7 +126,8 @@ class RobustnessEvaluator:
         base_response = base_res.get("response", "")
 
         results = []
-        for q in noisy_queries:
+        for i, q in enumerate(noisy_queries, 1):
+            print(f"    [{i}/{len(noisy_queries)}] Noisy query: {q[:50]}...")
             start = time.time()
             res = orchestrator.execute(q)
             elapsed = round(time.time() - start, 3)
@@ -156,11 +157,12 @@ class RobustnessEvaluator:
         successful_matches = 0
         latencies = []
 
-        for q_obj in queries:
+        for i, q_obj in enumerate(queries, 1):
             query = q_obj["query"]
             expected = q_obj["expected"]
             category = q_obj.get("category", "general")
 
+            print(f"    [{i}/{len(queries)}] Processing: {query[:50]}...")
             orchestrator = SimpleInventoryOrchestrator(dataframe=self.df, user_role="admin")
             cpu_before = _cpu_snapshot()
             start_time = time.time()
