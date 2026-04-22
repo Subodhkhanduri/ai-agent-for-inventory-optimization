@@ -97,7 +97,12 @@ class RobustnessEvaluator:
 
         latencies = [r["latency"] for r in results]
         unique_responses = len(set(r["response"] for r in results))
-        consistency_score = (trials - (unique_responses - 1)) / trials
+        # Proportion of responses matching the modal (most frequent) response.
+        # Range [1/trials, 1.0]. All-identical -> 1.0; all-unique -> 1/trials.
+        from collections import Counter
+        response_counts = Counter(r["response"] for r in results)
+        most_common_count = response_counts.most_common(1)[0][1]
+        consistency_score = most_common_count / trials
 
         return {
             "query": query,
@@ -301,6 +306,7 @@ class RobustnessEvaluator:
 
         pipeline_results = []
         direct_results = []
+        summary_results = []
 
         for q_obj in queries:
             query = q_obj["query"]
@@ -356,11 +362,75 @@ Answer this question accurately and concisely:
             })
             time.sleep(1.0) # Rate limit protection
 
+            # ── C. Direct LLM + summary stats (fair baseline) ──
+            # Same query, but the LLM receives the same aggregate information
+            # a SQL tool would produce. Isolates the effect of delegation.
+            cols = list(self.df.columns)
+            shape = f"{self.df.shape[0]} rows × {self.df.shape[1]} columns"
+
+            numeric_cols = self.df.select_dtypes(include=['number']).columns.tolist()
+            summary_lines = [f"Dataset shape: {shape}", f"Columns: {cols}"]
+            for col in numeric_cols:
+                s = self.df[col]
+                summary_lines.append(
+                    f"{col}: sum={s.sum():.0f}, mean={s.mean():.2f}, "
+                    f"min={s.min():.0f}, max={s.max():.0f}, "
+                    f"unique={s.nunique()}"
+                )
+            if "Item" in self.df.columns and "Daily_Sales" in self.df.columns:
+                per_item = self.df.groupby("Item")["Daily_Sales"].sum().to_dict()
+                summary_lines.append(f"Total Daily_Sales per Item: {per_item}")
+            if "Store" in self.df.columns and "Daily_Sales" in self.df.columns:
+                per_store = self.df.groupby("Store")["Daily_Sales"].sum().to_dict()
+                summary_lines.append(f"Total Daily_Sales per Store: {per_store}")
+            if ("Item" in self.df.columns and "Store" in self.df.columns
+                    and "Daily_Sales" in self.df.columns):
+                per_pair = (
+                    self.df.groupby(["Item", "Store"])["Daily_Sales"]
+                    .sum()
+                    .to_dict()
+                )
+                if len(per_pair) <= 200:
+                    summary_lines.append(
+                        f"Total Daily_Sales per (Item, Store): {per_pair}"
+                    )
+            summary_block = "\n".join(summary_lines)
+
+            summary_prompt = f"""You have access to the following summary of an inventory dataset:
+
+{summary_block}
+
+Answer this question using the summary above. Be accurate and concise:
+{query}"""
+
+            start3 = time.time()
+            try:
+                summary_resp = llm.invoke([{"role": "user", "content": summary_prompt}])
+                summary_text = summary_resp.content
+            except Exception as e:
+                summary_text = f"Error: {e}"
+            summary_time = round(time.time() - start3, 3)
+
+            clean_sum = str(summary_text).lower().replace(",", "").replace("$", "").strip()
+            clean_exp_s = str(expected).lower().replace(",", "").replace("$", "").strip()
+            summary_match = clean_exp_s in clean_sum
+
+            summary_results.append({
+                "query": query,
+                "expected": expected,
+                "response_preview": summary_text[:150],
+                "is_match": summary_match,
+                "latency": summary_time,
+            })
+            time.sleep(1.0)  # Rate-limit protection
+
         # Aggregate
         pipe_latencies = [r["latency"] for r in pipeline_results]
         direct_latencies = [r["latency"] for r in direct_results]
+        summary_latencies = [r["latency"] for r in summary_results]
         pipe_accuracy = sum(1 for r in pipeline_results if r["is_match"]) / len(pipeline_results) if pipeline_results else 0
         direct_accuracy = sum(1 for r in direct_results if r["is_match"]) / len(direct_results) if direct_results else 0
+        summary_accuracy = sum(1 for r in summary_results if r["is_match"]) / len(summary_results) if summary_results else 0
 
         return {
             "pipeline": {
@@ -372,6 +442,11 @@ Answer this question accurately and concisely:
                 "accuracy": round(direct_accuracy, 2),
                 "latency_stats": _percentiles(direct_latencies) if direct_latencies else {},
                 "details": direct_results,
+            },
+            "direct_llm_with_summary": {
+                "accuracy": round(summary_accuracy, 2),
+                "latency_stats": _percentiles(summary_latencies) if summary_latencies else {},
+                "details": summary_results,
             },
         }
 

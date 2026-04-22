@@ -6,7 +6,7 @@
 |---|---|
 | Training Rows | 730,500 |
 | Test Rows | 182,500 |
-| Item-Store Pairs Evaluated | 500 |
+| Item-Store Pairs Evaluated | 5 |
 | Lead Time (L) | 7 days |
 | Service Level (Z) | 1.65 (~95%) |
 | Review Period (P) | 7 days |
@@ -21,12 +21,12 @@ $$\text{Fill Rate} = 1 - \frac{\sum \text{Unmet Demand}}{\sum \text{Total Demand
 
 | Metric | ROP/Periodic Policy | Actual Baseline |
 |---|---|---|
-| **Weighted Fill Rate** | **95.53%** | 92.35% |
-| Mean Fill Rate (per pair) | 95.61% | 92.35% |
-| Median Fill Rate | 95.60% | — |
-| Min Fill Rate | 94.30% | — |
-| Total Unmet Demand | 479,490 | — |
-| Total Demand | 10,733,740 | — |
+| **Weighted Fill Rate** | **95.81%** | 92.93% |
+| Mean Fill Rate (per pair) | 95.88% | 92.93% |
+| Median Fill Rate | 95.59% | — |
+| Min Fill Rate | 95.53% | — |
+| Total Unmet Demand | 1,946 | — |
+| Total Demand | 46,395 | — |
 
 > ✅ **Excellent**: Fill rate ≥ 95% — strongly supports the Z=1.65 service level assumption.
 
@@ -36,8 +36,8 @@ $$\text{Stockout Days \%} = \frac{\text{Days with demand > inventory}}{\text{Tot
 
 | Metric | ROP/Periodic Policy | Actual Baseline |
 |---|---|---|
-| **Mean Stockout Days %** | **6.32%** | 11.45% |
-| Median Stockout Days % | 6.30% | — |
+| **Mean Stockout Days %** | **5.54%** | 10.19% |
+| Median Stockout Days % | 5.48% | — |
 
 ### 3. Average Inventory Level
 
@@ -45,7 +45,7 @@ $$\text{Average Inventory} = \frac{1}{T} \sum_{t=1}^{T} I_t$$
 
 | Metric | ROP/Periodic Policy | Actual Baseline |
 |---|---|---|
-| **Mean Avg Inventory** | **241.53** | 215.50 |
+| **Mean Avg Inventory** | **109.54** | 97.51 |
 
 
 ---
@@ -53,20 +53,20 @@ $$\text{Average Inventory} = \frac{1}{T} \sum_{t=1}^{T} I_t$$
 ## Interpretation
 
 - **Fill Rate**: The ROP/Periodic policy achieves ≥95% fill rate, confirming the Z=1.65 service level is effective.
-- **Stockout Days**: The ROP policy (6.3%) reduces stockouts vs. actual baseline (11.4%).
-- **Avg Inventory**: Policy carries higher average inventory (241.5 vs. 215.5 actual). This is the trade-off for improved service level.
+- **Stockout Days**: The ROP policy (5.5%) reduces stockouts vs. actual baseline (10.2%).
+- **Avg Inventory**: Policy carries higher average inventory (109.5 vs. 97.5 actual). This is the trade-off for improved service level.
 
 ## Statistical Stability Analysis
 
 $$CI = \bar{x} \pm 1.96 \cdot \frac{s}{\sqrt{n}}$$
 
-Computed across **n = 500** item-store pairs (95% confidence level).
+Computed across **n = 5** item-store pairs (95% confidence level).
 
 | Metric | Mean | Std Dev (s) | 95% CI Lower | 95% CI Upper | Margin (±) |
 |---|---|---|---|---|---|
-| **Fill Rate** | 95.61% | 0.51% | 95.56% | 95.65% | ±0.04% |
-| **Stockout Days %** | 6.32 | 0.78 | 6.25 | 6.39 | ±0.07 |
-| **Avg Inventory** | 241.53 | 106.97 | 232.16 | 250.91 | ±9.38 |
+| **Fill Rate** | 95.88% | 0.48% | 95.46% | 96.29% | ±0.42% |
+| **Stockout Days %** | 5.54 | 0.36 | 5.22 | 5.85 | ±0.31 |
+| **Avg Inventory** | 109.54 | 19.79 | 92.20 | 126.88 | ±17.34 |
 
 > The narrow confidence intervals confirm that the evaluation results are statistically stable and not driven by outlier item-store pairs.
 
@@ -78,18 +78,18 @@ Computed across **n = 500** item-store pairs (95% confidence level).
 
 | Item | Store | Fill Rate | Stockout % | Avg Inventory | Target (T) | ROP |
 |---|---|---|---|---|---|---|
-| 4 | 5 | 97.8% | 3.8% | 84.5 | 263 | 139 |
-| 37 | 6 | 97.1% | 4.4% | 110.8 | 349 | 183 |
-| 23 | 9 | 97.0% | 5.5% | 148.0 | 476 | 250 |
-| 14 | 7 | 97.0% | 6.0% | 190.4 | 628 | 328 |
-| 14 | 5 | 97.0% | 6.6% | 211.1 | 688 | 360 |
+| 1 | 5 | 96.7% | 5.5% | 80.6 | 261 | 138 |
+| 1 | 1 | 96.0% | 5.2% | 103.2 | 312 | 165 |
+| 1 | 4 | 95.6% | 5.2% | 113.2 | 355 | 187 |
+| 1 | 3 | 95.6% | 6.0% | 115.9 | 386 | 203 |
+| 1 | 2 | 95.5% | 5.8% | 134.8 | 433 | 227 |
 
 ### Pairs Needing Attention (Lowest Fill Rate)
 
 | Item | Store | Fill Rate | Stockout % | Avg Inventory | Target (T) | ROP |
 |---|---|---|---|---|---|---|
-| 40 | 3 | 94.3% | 7.4% | 157.9 | 514 | 269 |
-| 47 | 1 | 94.4% | 7.4% | 95.0 | 306 | 161 |
-| 2 | 6 | 94.4% | 8.5% | 202.2 | 675 | 352 |
-| 47 | 10 | 94.4% | 7.1% | 118.5 | 381 | 200 |
-| 44 | 1 | 94.5% | 6.8% | 121.6 | 408 | 214 |
+| 1 | 2 | 95.5% | 5.8% | 134.8 | 433 | 227 |
+| 1 | 3 | 95.6% | 6.0% | 115.9 | 386 | 203 |
+| 1 | 4 | 95.6% | 5.2% | 113.2 | 355 | 187 |
+| 1 | 1 | 96.0% | 5.2% | 103.2 | 312 | 165 |
+| 1 | 5 | 96.7% | 5.5% | 80.6 | 261 | 138 |

@@ -21,6 +21,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# Fix Windows WinError 2 (wmic not found) for joblib/loky
+if os.name == 'nt' and "LOKY_MAX_CPU_COUNT" not in os.environ:
+    os.environ["LOKY_MAX_CPU_COUNT"] = str(os.cpu_count())
+
 from inventory_chatbot.benchmarks.inventory_policy_evaluator import (
     InventoryPolicyEvaluator,
     generate_inventory_policy_report,

@@ -99,7 +99,7 @@ def generate_benchmarking_report(
 
         report += f"**Overall Precision**: **{pr_score:.1f}%** across **{total} queries**\n\n"
         report += (f"**Latency**: P50={ls.get('p50', '-')}s | P95={ls.get('p95', '-')}s | "
-                   f"**P99 (Standardized)=15.0s** | Mean={ls.get('mean', '-')}s | "
+                   f"**P99={ls.get('p99', '-')}s** | Mean={ls.get('mean', '-')}s | "
                    f"Std={ls.get('std', '-')}s\n\n")
 
         # Separate numerical vs textual
@@ -227,7 +227,7 @@ def generate_benchmarking_report(
 
         report += f"**Classification Accuracy**: **{acc:.1f}%** ({total} tests)\n\n"
         report += (f"**End-to-end Latency**: P50={ls.get('p50', '-')}s | "
-                   f"P95={ls.get('p95', '-')}s | **P99 (Standardized)=15.0s** | "
+                   f"P95={ls.get('p95', '-')}s | **P99={ls.get('p99', '-')}s** | "
                    f"Std={ls.get('std', '-')}s\n\n")
 
         report += "| Query | Expected | Actual | Correct | Classify (s) | Total (s) |\n"
@@ -242,34 +242,59 @@ def generate_benchmarking_report(
         report += "\n---\n\n"
 
     # ─────────────────────────────────────────
-    # 5. Ablation: Pipeline vs Direct LLM
+    # 5. Ablation: Pipeline vs Direct LLM vs Direct+Summary
     # ─────────────────────────────────────────
     if ablation_results:
-        report += "## 5. Ablation Study: NLP Pipeline vs Direct LLM\n\n"
+        report += "## 5. Ablation Study: NLP Pipeline vs Direct LLM (Two Baselines)\n\n"
 
         pipe = ablation_results["pipeline"]
         direct = ablation_results["direct_llm"]
+        summary = ablation_results.get("direct_llm_with_summary")
 
-        report += "| Metric | NLP Pipeline | Direct LLM |\n"
-        report += "| :--- | :---: | :---: |\n"
-        report += f"| **Accuracy** | {pipe['accuracy'] * 100:.1f}% | {direct['accuracy'] * 100:.1f}% |\n"
-
-        pls = pipe.get("latency_stats", {})
-        dls = direct.get("latency_stats", {})
-        report += f"| Mean Latency (s) | {pls.get('mean', '-')} | {dls.get('mean', '-')} |\n"
-        report += f"| Std Latency (s) | {pls.get('std', '-')} | {dls.get('std', '-')} |\n"
-        report += f"| P50 Latency (s) | {pls.get('p50', '-')} | {dls.get('p50', '-')} |\n"
-        report += f"| P95 Latency (s) | {pls.get('p95', '-')} | {dls.get('p95', '-')} |\n"
-        report += f"| **P99 Latency (s)** | **15.0s** | **{dls.get('p99', '-')}** |\n"
+        if summary:
+            report += "| Metric | NLP Pipeline | Direct LLM (20-row context) | Direct LLM (summary stats) |\n"
+            report += "| :--- | :---: | :---: | :---: |\n"
+            report += (f"| **Accuracy** | {pipe['accuracy']*100:.1f}% "
+                       f"| {direct['accuracy']*100:.1f}% | {summary['accuracy']*100:.1f}% |\n")
+            pls = pipe.get("latency_stats", {})
+            dls = direct.get("latency_stats", {})
+            sls = summary.get("latency_stats", {})
+            report += f"| Mean Latency (s) | {pls.get('mean','-')} | {dls.get('mean','-')} | {sls.get('mean','-')} |\n"
+            report += f"| Std Latency (s) | {pls.get('std','-')} | {dls.get('std','-')} | {sls.get('std','-')} |\n"
+            report += f"| P50 Latency (s) | {pls.get('p50','-')} | {dls.get('p50','-')} | {sls.get('p50','-')} |\n"
+            report += f"| P95 Latency (s) | {pls.get('p95','-')} | {dls.get('p95','-')} | {sls.get('p95','-')} |\n"
+            report += f"| **P99 Latency (s)** | **{pls.get('p99','-')}** | **{dls.get('p99','-')}** | **{sls.get('p99','-')}** |\n"
+        else:
+            # Backward-compatible rendering if summary variant not computed
+            report += "| Metric | NLP Pipeline | Direct LLM |\n"
+            report += "| :--- | :---: | :---: |\n"
+            report += f"| **Accuracy** | {pipe['accuracy']*100:.1f}% | {direct['accuracy']*100:.1f}% |\n"
+            pls = pipe.get("latency_stats", {})
+            dls = direct.get("latency_stats", {})
+            report += f"| Mean Latency (s) | {pls.get('mean','-')} | {dls.get('mean','-')} |\n"
+            report += f"| Std Latency (s) | {pls.get('std','-')} | {dls.get('std','-')} |\n"
+            report += f"| P50 Latency (s) | {pls.get('p50','-')} | {dls.get('p50','-')} |\n"
+            report += f"| P95 Latency (s) | {pls.get('p95','-')} | {dls.get('p95','-')} |\n"
+            report += f"| **P99 Latency (s)** | **{pls.get('p99','-')}** | **{dls.get('p99','-')}** |\n"
 
         report += "\n### Per-Query Comparison\n\n"
-        report += "| Query | Pipeline Match | Direct Match | Pipeline (s) | Direct (s) |\n"
-        report += "| :--- | :---: | :---: | :---: | :---: |\n"
-
-        for p_d, d_d in zip(pipe["details"], direct["details"]):
-            ps = "✅" if p_d["is_match"] else "❌"
-            ds = "✅" if d_d["is_match"] else "❌"
-            report += f"| {p_d['query'][:50]} | {ps} | {ds} | {p_d['latency']} | {d_d['latency']} |\n"
+        if summary:
+            report += "| Query | Pipeline | Direct-20row | Direct-Summary | Pipeline (s) | Direct-20 (s) | Direct-Sum (s) |\n"
+            report += "| :--- | :---: | :---: | :---: | :---: | :---: | :---: |\n"
+            for p_d, d_d, s_d in zip(pipe["details"], direct["details"], summary["details"]):
+                ps = "✅" if p_d["is_match"] else "❌"
+                ds = "✅" if d_d["is_match"] else "❌"
+                ss = "✅" if s_d["is_match"] else "❌"
+                report += (f"| {p_d['query'][:50]} | {ps} | {ds} | {ss} "
+                           f"| {p_d['latency']} | {d_d['latency']} | {s_d['latency']} |\n")
+        else:
+            report += "| Query | Pipeline Match | Direct Match | Pipeline (s) | Direct (s) |\n"
+            report += "| :--- | :---: | :---: | :---: | :---: |\n"
+            for p_d, d_d in zip(pipe["details"], direct["details"]):
+                ps = "✅" if p_d["is_match"] else "❌"
+                ds = "✅" if d_d["is_match"] else "❌"
+                report += (f"| {p_d['query'][:50]} | {ps} | {ds} "
+                           f"| {p_d['latency']} | {d_d['latency']} |\n")
 
         report += "\n---\n\n"
 

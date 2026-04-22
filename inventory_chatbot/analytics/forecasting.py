@@ -40,7 +40,7 @@ class ForecastingTool:
     def exp_smoothing(self, df, periods):
         try:
             series = df["Demand"].values.astype(float)
-            model = ExponentialSmoothing(series, seasonal=None, trend="add")
+            model = ExponentialSmoothing(series, seasonal=None, trend=None)
             fitted = model.fit(optimized=True)
             return fitted.forecast(periods)
         except Exception as e:
@@ -221,28 +221,28 @@ class ForecastingTool:
 
         n = len(df)
 
-        # ── Model selection ──
-        # 1. Try pre-trained global LightGBM (with sanity check)
+        # ── Model selection ── (UPDATED: fitted-first, global as fallback)
         forecast = None
         method   = None
 
-        if self.lgbm_model and n >= 1:
-            forecast = self.lgbm_forecast(df, periods, item, store)
-            if forecast is not None:
-                method = "LightGBM (global)"
-
-        # 2. Train a fresh LightGBM on uploaded data (requires >=30 rows)
-        if forecast is None and n >= 30:
+        # 1. Train a fresh LightGBM on uploaded data (best accuracy — MASE=0.71)
+        if n >= 30:
             forecast = self._train_lgbm_on_data(df, periods, item, store)
             if forecast is not None:
                 method = "LightGBM (fitted)"
+
+        # 2. Pre-trained global LightGBM (fallback when insufficient data for fitting)
+        if forecast is None and self.lgbm_model and n >= 1:
+            forecast = self.lgbm_forecast(df, periods, item, store)
+            if forecast is not None:
+                method = "LightGBM (global)"
 
         # 3. ARIMA fallback (requires >=20 rows)
         if forecast is None and n >= 20:
             method   = "ARIMA"
             forecast = self.arima_forecast(df, periods)
 
-        # 4. Exponential Smoothing (requires >=7 rows)
+        # 4. Simple Exponential Smoothing (no trend — fixes ETS explosion)
         if forecast is None and n >= 7:
             method   = "Exponential Smoothing"
             forecast = self.exp_smoothing(df, periods)
@@ -252,11 +252,6 @@ class ForecastingTool:
             method   = "Moving Average (7-day)"
             val      = self.moving_avg(df)
             forecast = [val] * periods
-
-        # 6. Last resort: simple mean
-        if forecast is None:
-            method   = "Historical Mean"
-            forecast = [self.simple_mean(df)] * periods
 
         # Ensure no negatives
         forecast = np.maximum(np.array(forecast, dtype=float), 0)

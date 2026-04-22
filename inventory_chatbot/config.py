@@ -17,6 +17,12 @@ logger = logging.getLogger(__name__)
 env_path = os.path.join(os.getcwd(), ".env")
 load_dotenv(env_path, override=True)
 
+# ------------------------------------------------------------------
+# Fix Windows WinError 2 (wmic not found) for joblib/loky
+# ------------------------------------------------------------------
+if os.name == 'nt' and "LOKY_MAX_CPU_COUNT" not in os.environ:
+    os.environ["LOKY_MAX_CPU_COUNT"] = str(os.cpu_count())
+
 
 class Settings(BaseSettings):
     """Application configuration — values are loaded from .env automatically."""
